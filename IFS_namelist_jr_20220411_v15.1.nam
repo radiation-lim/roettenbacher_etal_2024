@@ -1,0 +1,152 @@
+! Configuration namelists for ecRad radiation scheme
+!
+! The "radiation_driver" namelist controls the behaviour of the driver
+! routine, including parallelization options and overriding numbers
+! read from the NetCDF input file. The "radiation" namelist controls
+! the behaviour of the radiative transfer algorithm itself. Any line
+! prefixed by "!" is ignored. If a namelist parameter is missing then
+! ecRad will use a default value. For most parameters you can see
+! what ecRad has used from the output printed to the terminal when it
+! runs.
+!
+
+! This version matches ! ! ! M O S T L Y ! ! ! the expected configuration of ECMWF IFS Cycle 47R3
+
+&radiation_driver
+!
+! GENERAL
+!
+do_parallel = true, ! Use OpenMP parallelization?
+nblocksize = 33, ! Number of columns to process per thread
+experiment_name = "Fu-IFS O1280 no low clouds",
+!
+! EXECUTION CONTROL
+!
+nrepeat = 1, ! number of times to repeat, for benchmarking
+istartcol = 1, ! Start at specified input column (1 based)
+iendcol = 10, ! End at specified input column (1 based)
+do_correct_unphysical_inputs = true, ! If input variables out of physical bounds, correct them and issue a warning
+!
+! SCALE OR OVERRIDE ECRAD INPUTS
+!
+fractional_std = 1, ! Fractional standard dev. of in-cloud water content
+! sw_albedo = 0.08, ! Override shortwave albedo
+solar_irradiance_override = 1355.180487, ! Top-of-atmosphere solar irradiance (W m-2)
+overlap_decorr_length = 482.87, ! mean cloud overlap decorrelation length for the case study period after Shonk et al. 2010 (m)
+! overlap_decorr_length_scaling = 1.0, ! Scale cloud overlap decorr. length
+! cos_solar_zenith_angle = 0.0, ! 0.0 = night-time, 1.0 = overhead sun
+!
+! SCALE GAS CONCENTRATIONS
+!
+h2o_scaling = 1.0, ! Scale water vapour concentration
+co2_scaling = 1.0, ! Scale carbon dioxide concentration
+o3_scaling = 1.0, ! Scale ozone concentration
+ch4_scaling = 1.0, ! Scale methane concentration
+n2o_scaling = 1.0, ! Scale nitrous oxide concentration
+o2_scaling = 1.0, ! Scale molecular oxygen concentration
+cfc11_scaling = 1.0, ! Scale CFC11 concentration
+cfc12_scaling = 1.0, ! Scale CFC12 concentration
+!
+! The following settings configure the SPARTACUS solver
+! cloud_separation_scale_toa = 14000.0,
+cloud_separation_scale_toa = 4550.0, ! This is dependent on the horizontal gridspacing such that C(TOA) = 1.62 delta x ** 0.47, IFS delta x = 9km
+cloud_separation_scale_surface = 2500.0,
+cloud_separation_scale_power = 3.5,
+cloud_inhom_separation_factor = 0.75,
+
+/
+!
+! The following namelist controls the behaviour of the ECRAD
+! radiation code
+!
+&radiation
+!
+! GENERAL
+!
+directory_name = "/projekt_agmwend/Modelle/ECMWF_ECRAD/src/ecrad-1.5.0/data", ! Location of configuration files
+do_sw = true, ! Compute shortwave fluxes?
+do_lw = true, ! Compute longwave fluxes?
+do_sw_direct = true, ! Compute direct downward shortwave fluxes?
+do_clear = true, ! Compute clear-sky fluxes?
+do_cloud_aerosol_per_sw_g_point = false,
+do_cloud_aerosol_per_lw_g_point = false,
+!
+! GAS OPTICS
+!
+gas_model_name = "RRTMG-IFS", ! Gas model
+!
+! AEROSOL OPTICS
+!
+use_aerosols = false, ! Include aerosols in radiation calculations?
+use_general_aerosol_optics = false, ! Support aerosol properties at an arbitrary spectral discretization (not just RRTMG)
+do_lw_aerosol_scattering = false, ! Aerosols scatter in the longwave?
+!n_aerosol_types = 12, ! Aerosols are deactivated if this is zero
+!
+! 12 IFS aerosol classes stored in aerosol_ifs_rrtm.nc: 1-3 Sea salt,
+! 4-6 Boucher desert dust, 7 hydrophilic organics, 8 hydrophobic
+! organics, 9&10 hydrophobic black carbon, 11 ammonium sulphate, 12
+! inactive SO2
+!
+! Indices to the aerosol optical properties in aerosol_ifs_rrtm.nc,
+! for each class, where negative numbers index hydrophilic aerosol
+! types and positive numbers index hydrophobic aerosol types
+! 
+! i_aerosol_type_map = -1, -2, -3, 1, 2, 3, -4, 10, 11, 11, -5, 14,
+
+! Tegen types are rather more simple
+!i_aerosol_type_map = 2, 2, 2, 3, 3, 3, 1, 1, 4, 4, 6, 5,
+!
+! CLOUD OPTICS
+!
+liquid_model_name = "SOCRATES", ! Liquid droplet scattering model
+ice_model_name = "Fu-IFS", ! Ice particle scattering model
+! ice_model_name = "Baran2017", ! Ice particle scattering model
+! ice_model_name = "Yi", ! Ice particle scattering model
+use_general_cloud_optics = false, ! Support arbitrary hydrometeor types (not just liquid and ice) with properties at an arbitrary spectral discretization (not just RRTMG)
+do_lw_cloud_scattering = false, ! Clouds scatter in the longwave?
+do_fu_lw_ice_optics_bug = false,
+!
+! SOLVER
+!
+sw_solver_name = "SPARTACUS",
+lw_solver_name = "SPARTACUS",
+overlap_scheme_name = "Exp-Ran", ! Exp-Ran, Max-Ran or Exp-Exp
+use_beta_overlap = false,
+cloud_inhom_decorr_scaling = 0.5, ! Ratio of overlap decorr len of inhomogeneities to boundaries
+cloud_fraction_threshold = 0.001e-3, ! Ignore clouds with fraction below this
+cloud_mixing_ratio_threshold = 1e-9, ! Ignore clouds with total mixing ratio below this
+do_sw_delta_scaling_with_gases = false,
+!
+! SPARTACUS SOLVER
+!
+do_3d_effects = false, ! Represent cloud edge effects when SPARTACUS solver selected; note that this option does not affect entrapment, which is also a 3D effect
+n_regions = 3, ! Number of regions used by SPARTACUS, where one is clear sky and one or two are cloud (the Tripleclouds solver always assumes three regions regardless of this parameter)
+do_lw_side_emissivity = true, ! Represent effective emissivity of the side of clouds
+sw_entrapment_name = "Explicit", ! Zero, Edge-only, Explicit, Non-fractal, Maximum are possible
+!
+! SURFACE
+!
+! surface albedo from Hanno Mueller
+do_nearest_spectral_sw_albedo = false,
+do_nearest_spectral_lw_emiss = true,
+do_weighted_surface_mapping = false,
+sw_albedo_wavelength_bound(1:5) = 0.25e-6, 0.44e-6, 0.69e-6, 1.19e-6, 2.38e-6,
+i_sw_albedo_index(1:6) = 1,2,3,4,5,6,
+lw_emiss_wavelength_bound(1:2) = 8.0e-6, 13.0e-6,
+i_lw_emiss_index(1:3) = 1,2,1,
+!
+! DIAGNOSTICS
+!
+! The "iverbose*" parameters specify the verbosity level: 0=none,
+! 1=warning, 2=info, 3=progress, 4=detailed, 5=debug
+iverbose = 5,
+iverbosesetup = 5,
+do_save_spectral_flux = true, ! Save spectral fluxes in output file?
+do_save_gpoint_flux = false, ! Save fluxes per g-point in output file?
+do_surface_sw_spectral_flux = true,
+do_lw_derivatives = true, ! Hogan-Bozzo style derivatives for approx updates
+do_save_radiative_properties = true, ! Save raw radiation properties in radiative_properties.nc?
+do_canopy_fluxes_sw = true,
+do_canopy_fluxes_lw = true,
+
+/
