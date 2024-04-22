@@ -213,25 +213,25 @@ for key in keys:
     print(f"Change of solar zenith angle during above cloud section of {key}: {tmp.sza[0]:.2f} - {tmp.sza[-1]:.2f}")
 
 # %% print sw albedo for 14 RRTMG bands
-    weights = xr.DataArray(np.array([[0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
-                                     [0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
-                                     [0.00, 0.00, 0.00, 0.00, 0.69, 0.31],
-                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
-                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
-                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
-                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
-                                     [0.00, 0.00, 0.00, 0.93, 0.07, 0.00],
-                                     [0.00, 0.00, 0.48, 0.52, 0.00, 0.00],
-                                     [0.00, 0.00, 1.00, 0.00, 0.00, 0.00],
-                                     [0.00, 0.99, 0.01, 0.00, 0.00, 0.00],
-                                     [0.00, 1.00, 0.00, 0.00, 0.00, 0.00],
-                                     [0.83, 0.17, 0.00, 0.00, 0.00, 0.00],
-                                     [0.00, 0.00, 0.00, 0.00, 0.00, 1.00]]), dims=["sw_band", "sw_albedo_band"])
-    for key in keys:
-        sw_albedo_14bands = (ecrad_dicts[key]['v15.1'].sw_albedo * weights).sum(dim='sw_albedo_band')
-        print(key)
-        for value in sw_albedo_14bands.sel(time=slices[key]['case']).mean(dim='time'):
-            print(value.to_numpy())
+weights = xr.DataArray(np.array([[0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
+                                 [0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
+                                 [0.00, 0.00, 0.00, 0.00, 0.69, 0.31],
+                                 [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                 [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                 [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                 [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                 [0.00, 0.00, 0.00, 0.93, 0.07, 0.00],
+                                 [0.00, 0.00, 0.48, 0.52, 0.00, 0.00],
+                                 [0.00, 0.00, 1.00, 0.00, 0.00, 0.00],
+                                 [0.00, 0.99, 0.01, 0.00, 0.00, 0.00],
+                                 [0.00, 1.00, 0.00, 0.00, 0.00, 0.00],
+                                 [0.83, 0.17, 0.00, 0.00, 0.00, 0.00],
+                                 [0.00, 0.00, 0.00, 0.00, 0.00, 1.00]]), dims=["sw_band", "sw_albedo_band"])
+for key in keys:
+    sw_albedo_14bands = (ecrad_dicts[key]['v15.1'].sw_albedo * weights).sum(dim='sw_albedo_band')
+    print(key)
+    for value in sw_albedo_14bands.sel(time=slices[key]['case']).mean(dim='time'):
+        print(value.to_numpy())
 
 # %% plot minimum ice effective radius from Sun2001 parameterization
 latitudes = np.arange(0, 91)
@@ -541,12 +541,13 @@ plt.show()
 plt.close()
 
 # %% plot IFS cloud fraction lidar/mask comparison
+var = 'cloud_fraction'
 plt.rc("font", size=7)
 fig, axs = plt.subplots(2, 1, figsize=(16 * h.cm, 9 * h.cm), layout="constrained")
 for i, key in enumerate(keys):
     ax = axs[i]
     ds = ecrad_dicts[key]["v15"].sel(time=slices[key]["case"])
-    ifs_plot = ds[["cloud_fraction", "iwc"]]
+    ifs_plot = ds[[var]]
     bahamas_plot = bahamas_ds[key].IRS_ALT.sel(time=slices[key]["case"]) / 1000
     # add new z axis mean pressure altitude
     if "half_level" in ifs_plot.dims:
@@ -570,13 +571,13 @@ for i, key in enumerate(keys):
         ifs_plot_new_z.append(tmp_plot)
 
     ifs_plot = xr.concat(ifs_plot_new_z, dim="time").sortby("height").sel(height=slice(0, 12))
-    ifs_plot = ifs_plot.where(ifs_plot.cloud_fraction > 0)
+    ifs_plot = ifs_plot.where(ifs_plot[var] > 0)  # > 1e-9) * 1e6
     halo_plot = varcloud_ds[key].sel(time=slices[key]["case"]).Varcloud_Input_Mask
     halo_plot = halo_plot.assign_coords(height=halo_plot.height / 1000).sortby("height")
     time_extend = pd.to_timedelta((ifs_plot.time[-1] - ifs_plot.time[0]).to_numpy())
 
     # plot IFS cloud cover prediction and Radar lidar mask
-    pcm = ifs_plot.cloud_fraction.plot(x="time", cmap=cm.sapphire, ax=ax, add_colorbar=False)
+    pcm = ifs_plot[var].plot(x="time", cmap=cm.sapphire, ax=ax, add_colorbar=False)
     halo_plot.plot.contour(x="time", levels=[0.9], colors=cbc[1], ax=ax, linewidths=2)
     ax.plot([], color=cbc[1], label="Radar & Lidar Mask", lw=2)
     bahamas_plot.plot(x="time", lw=2, color=cbc[-2], label="HALO altitude", ax=ax)
@@ -587,13 +588,13 @@ for i, key in enumerate(keys):
     ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=0, ha="center")
 
 # place colorbar for both flights
-fig.colorbar(pcm, ax=axs[:2], label=f"IFS {h.cbarlabels['cloud_fraction'].lower()}", pad=0.001)
+fig.colorbar(pcm, ax=axs[:2], label=f"IFS {h.cbarlabels[var].lower()} {h.plot_units[var]}", pad=0.001)
 axs[0].legend()
 axs[0].set_xlabel("")
 axs[0].text(0.03, 0.88, "(a) RF 17", transform=axs[0].transAxes, bbox=dict(boxstyle="Round", fc="white"))
 axs[1].text(0.03, 0.88, "(b) RF 18", transform=axs[1].transAxes, bbox=dict(boxstyle="Round", fc="white"))
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_cloud_fraction_radar_lidar_mask.pdf"
+figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_{var}_radar_lidar_mask.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
