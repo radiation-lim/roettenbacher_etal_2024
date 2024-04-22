@@ -50,7 +50,8 @@ cbc = h.get_cb_friendly_colors("petroff_6")
 
 # %% set paths
 campaign = "halo-ac3"
-plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figures"
+plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figures_review"
+h.make_dir(plot_path)
 trajectory_path = f"{h.get_path('trajectories', campaign=campaign)}/selection_CC_and_altitude"
 keys = ["RF17", "RF18"]
 ecrad_versions = ["v13.2", "v15", "v15.1", "v16", "v17", "v18.1", "v19.1", "v20", "v21", "v28", "v29",
@@ -210,6 +211,27 @@ for key in keys:
     print(f"Range of solar zenith angle during case study of {key}: {tmp.sza.min():.2f} - {tmp.sza.max():.2f}")
     tmp = bacardi_ds[key].sel(time=slices[key]["above"])
     print(f"Change of solar zenith angle during above cloud section of {key}: {tmp.sza[0]:.2f} - {tmp.sza[-1]:.2f}")
+
+# %% print sw albedo for 14 RRTMG bands
+    weights = xr.DataArray(np.array([[0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
+                                     [0.00, 0.00, 0.00, 0.00, 0.00, 1.00],
+                                     [0.00, 0.00, 0.00, 0.00, 0.69, 0.31],
+                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                     [0.00, 0.00, 0.00, 0.00, 1.00, 0.00],
+                                     [0.00, 0.00, 0.00, 0.93, 0.07, 0.00],
+                                     [0.00, 0.00, 0.48, 0.52, 0.00, 0.00],
+                                     [0.00, 0.00, 1.00, 0.00, 0.00, 0.00],
+                                     [0.00, 0.99, 0.01, 0.00, 0.00, 0.00],
+                                     [0.00, 1.00, 0.00, 0.00, 0.00, 0.00],
+                                     [0.83, 0.17, 0.00, 0.00, 0.00, 0.00],
+                                     [0.00, 0.00, 0.00, 0.00, 0.00, 1.00]]), dims=["sw_band", "sw_albedo_band"])
+    for key in keys:
+        sw_albedo_14bands = (ecrad_dicts[key]['v15.1'].sw_albedo * weights).sum(dim='sw_albedo_band')
+        print(key)
+        for value in sw_albedo_14bands.sel(time=slices[key]['case']).mean(dim='time'):
+            print(value.to_numpy())
 
 # %% plot minimum ice effective radius from Sun2001 parameterization
 latitudes = np.arange(0, 91)
