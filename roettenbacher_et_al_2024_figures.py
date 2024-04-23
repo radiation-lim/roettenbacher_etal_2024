@@ -43,6 +43,7 @@ from metpy.calc import relative_humidity_from_specific_humidity
 from metpy.units import units as u
 from scipy.stats import median_abs_deviation
 from sklearn.neighbors import BallTree
+from skimage import io
 from tqdm import tqdm
 
 h.set_cb_friendly_colors("petroff_6")
@@ -60,12 +61,15 @@ ecrad_versions = ["v13.2", "v15", "v15.1", "v16", "v17", "v18.1", "v19.1", "v20"
 # %% read in data
 (
     bahamas_ds, bacardi_ds, bacardi_ds_res, ecrad_dicts, varcloud_ds, above_clouds, below_clouds, slices,
-    ecrad_orgs, ifs_ds, ifs_ds_sel, dropsonde_ds, albedo_dfs
-) = (dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict())
+    ecrad_orgs, ifs_ds, ifs_ds_sel, dropsonde_ds, albedo_dfs, sat_imgs
+) = (dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict(), dict())
 
+left, right, bottom, top = 0, 1000000, -1000000, 0
+sat_img_extent = (left, right, bottom, top)
 for key in keys:
     flight = meta.flight_names[key]
     date = flight[9:17]
+    urldate = pd.to_datetime(date).strftime('%Y-%m-%d')
     bacardi_path = h.get_path("bacardi", flight, campaign)
     bahamas_path = h.get_path("bahamas", flight, campaign)
     ifs_path = f"{h.get_path('ifs', flight, campaign)}/{date}"
@@ -80,6 +84,10 @@ for key in keys:
     ifs_file = f"ifs_{date}_00_ml_O1280_processed.nc"
     varcloud_file = [f for f in os.listdir(varcloud_path) if f.endswith(".nc")][0]
     dropsonde_files = [f for f in os.listdir(dropsonde_path) if f.endswith(".nc")]
+    sat_url = f'https://gibs.earthdata.nasa.gov/wms/epsg3413/best/wms.cgi?\
+version=1.3.0&service=WMS&request=GetMap&\
+format=image/png&STYLE=default&bbox={left},{bottom},{right},{top}&CRS=EPSG:3413&\
+HEIGHT=8192&WIDTH=8192&TIME={urldate}&layers=MODIS_Terra_CorrectedReflectance_Bands367'
 
     # read in aircraft data
     bahamas_ds[key] = xr.open_dataset(f"{bahamas_path}/{bahamas_file}")
@@ -97,6 +105,9 @@ for key in keys:
             dropsondes[k]["ta"] = dropsondes[k].ta - 273.15
             dropsondes[k]["rh"] = dropsondes[k].rh * 100
     dropsonde_ds[key] = dropsondes
+
+    # read in satellite image
+    sat_imgs[key] = io.imread(sat_url)
 
     # read in ifs data
     ifs = xr.open_dataset(f"{ifs_path}/{ifs_file}")
@@ -1921,5 +1932,57 @@ ax.set(title=f"{key} - IWP above cloud section",
        ylabel="IWP (g$\,$m$^{-2}$)")
 ax.grid()
 ax.legend()
+plt.show()
+plt.close()
+# %% plot satellite image together with flight track
+labels = ['(a)', '(b)']
+data_crs = ccrs.PlateCarree()
+plot_crs = ccrs.NorthPolarStereo(central_longitude=-45)
+extent = sat_img_extent
+plt.rc('font', size=10)
+_, axs = plt.subplots(1, 2, figsize=(18 * h.cm, 9 * h.cm),
+                      subplot_kw={'projection': plot_crs},
+                      layout='constrained')
+for i, key in enumerate(keys):
+    ax = axs[i]
+    # satellite
+    ax.imshow(sat_imgs[key], extent=extent, origin='upper')
+    # bahamas
+    ax.plot(bahamas_ds[key].IRS_LON, bahamas_ds[key].IRS_LAT,
+            color='k', transform=data_crs, label='HALO flight track')
+    # dropsondes
+    for ds in dropsonde_ds[key].values():
+        launch_time = pd.to_datetime(ds.launch_time.to_numpy()) if key == 'RF17' else pd.to_datetime(ds.time[0].to_numpy())
+        x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
+        cross = ax.plot(x, y, 'X', color=cbc[0], markersize=7, transform=data_crs,
+                        zorder=450)
+        if key == 'RF17':
+            ax.text(x, y, f'{launch_time:%H:%M}', c='k', transform=data_crs, zorder=500,
+                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground='white')])
+        else:
+            for iii in [3, 9]:
+                ds = list(dropsonde_ds[key].values())[iii]
+                launch_time = pd.to_datetime(ds.time[-1].to_numpy())
+                x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
+                ax.text(x, y, f"{launch_time:%H:%M}", color="k", transform=data_crs, zorder=500,
+                        path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
+    # add legend artist
+    ax.plot([], label='Dropsonde', ls='', marker='X', color=cbc[0], markersize=7)
+
+    ax.coastlines(color='k', linewidth=1)
+    gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
+    gl.top_labels = False
+    gl.right_labels = False
+
+    ax.set(
+        title=f'{labels[i]} {key.replace("1", " 1")}',
+        xlim=(left, right),
+        ylim=(bottom, top),
+    )
+
+
+axs[1].legend()
+figname = f'{plot_path}/HALO-AC3_RF17_RF18_MODIS_Bands367_flight_track.pdf'
+plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
