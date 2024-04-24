@@ -56,7 +56,7 @@ h.make_dir(plot_path)
 trajectory_path = f"{h.get_path('trajectories', campaign=campaign)}/selection_CC_and_altitude"
 keys = ["RF17", "RF18"]
 ecrad_versions = ["v13.2", "v15", "v15.1", "v16", "v17", "v18.1", "v19.1", "v20", "v21", "v28", "v29",
-                  "v30.1", "v31.1", "v32.1", "v33", "v34", "v35", "v36", "v37", "v38"]
+                  "v30.1", "v31.1", "v32.1", "v33", "v34", "v35", "v36", "v37", "v38", "v39.2", "v40.2"]
 
 # %% read in data
 (
@@ -1983,6 +1983,155 @@ for i, key in enumerate(keys):
 
 axs[1].legend()
 figname = f'{plot_path}/HALO-AC3_RF17_RF18_MODIS_Bands367_flight_track.pdf'
+plt.savefig(figname, dpi=300)
+plt.show()
+plt.close()
+# %% plot reice with and without cosine dependence for case study clouds
+plt.rc("font", size=9)
+legend_labels = ["Off", "On"]
+binsizes = dict(iwc=1, reice=4)
+binedges = dict(iwc=20, reice=100)
+text_loc_x = 0.03
+text_loc_y = 0.95
+ylims = {"iwc": (0, 0.3), "reice": (0, 0.25)}
+_, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
+
+# left panel - RF17 re_ice
+ax = axs[0]
+plot_ds = ecrad_orgs['RF17']
+sel_time = slices['RF17']['case']
+bins = np.arange(0, binedges["reice"], binsizes["reice"])
+for i, v in enumerate(["v39.2", "v15.1"]):
+    pds = plot_ds[v].re_ice.sel(time=sel_time).to_numpy().flatten() * 1e6
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+    print(f"RF17 Mean reice {v}: {pds.mean():.2f}")
+
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(a) RF 17",
+        transform=ax.transAxes,
+        bbox=dict(boxstyle="Round", fc="white")
+        )
+ax.set(ylabel="Probability density function",
+       xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
+       ylim=ylims["reice"])
+ax.legend(title='Cosine dependence')
+
+# right panel - RF18 re_ice
+ax = axs[1]
+plot_ds = ecrad_orgs['RF18']
+sel_time = slices['RF18']['case']
+bins = np.arange(0, binedges["reice"], binsizes["reice"])
+for i, v in enumerate(["v39.2", "v15.1"]):
+    pds = plot_ds[v].re_ice.sel(time=sel_time).to_numpy().flatten() * 1e6
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+    print(f"RF18 Mean reice {v}: {pds.mean():.2f}")
+
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(b) RF 18",
+        transform=ax.transAxes,
+        bbox=dict(boxstyle="Round", fc="white")
+        )
+ax.set(ylabel="",
+       xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
+       ylim=ylims["reice"])
+
+figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_re_ice_pdf_case_studies_cosine_dependence.pdf"
+plt.savefig(figname, dpi=300)
+plt.show()
+plt.close()
+
+# %% plot PDF of transmissivity (above cloud simulation) below cloud all columns - cosine dependence
+transmissivity_stats = list()
+plt.rc("font", size=9)
+label = ["(a)", "(b)"]
+legend_labels = ["Cosine", "No cosine"]
+ylims = (0, 36)
+legend_loc = 3
+binsize = 0.01
+xlabel = "Solar Transmissivity"
+color = [cbc[1], cbc[5]]
+_, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
+for i, key in enumerate(keys):
+    ax = axs[i]
+    l = label[i]
+    bacardi_sel = bacardi_ds[key].sel(time=slices[key]["below"])
+    bacardi_plot = bacardi_sel[f"transmissivity_above_cloud"].resample(time="1Min").mean()
+    bins = np.arange(0.5, 1.0, binsize)
+    # BACARDI histogram
+    bacardi_hist = np.histogram(bacardi_plot, density=True, bins=bins)
+
+    # save statistics
+    transmissivity_stats.append((key, "BACARDI", "Mean", bacardi_plot.mean().to_numpy()))
+    transmissivity_stats.append((key, "BACARDI", "Median", bacardi_plot.median().to_numpy()))
+    # plot histogram
+    sns.histplot(bacardi_plot, label="BACARDI", ax=ax, stat="density", kde=False, bins=bins)
+    # add mean
+    ax.axvline(bacardi_plot.mean(), color=cbc[0], lw=3, ls="--")
+    ax.plot([], ls="--", color="k", label="Mean")  # label for means
+
+    for ii, v in enumerate(["v15.1", "v39.2"]):
+        v_name = legend_labels[ii]
+        ecrad_ds = ecrad_orgs[key][v].sel(time=slices[key]["below"])
+        height_sel = ecrad_ds["aircraft_level"]
+        ecrad_plot = ecrad_ds[f"transmissivity_sw_above_cloud"].isel(half_level=height_sel)
+
+        # save statistics
+        transmissivity_stats.append((key, v_name, "Mean", ecrad_plot.mean().to_numpy()))
+        transmissivity_stats.append((key, v_name, "Median", ecrad_plot.median().to_numpy()))
+        # actual plotting
+        sns.histplot(ecrad_plot.to_numpy().flatten(), label=v_name, stat="density",
+                     kde=False, bins=bins, ax=ax, color=color[ii])
+        # add mean
+        ax.axvline(ecrad_plot.mean(), color=color[ii], lw=3, ls="--")
+        # textbox
+        hist = np.histogram(ecrad_plot, density=True, bins=bins)
+
+    ax.set(
+        xlabel=xlabel,
+        ylabel="",
+        ylim=ylims,
+        xlim=(0.45, 1)
+    )
+    handles, labels = ax.get_legend_handles_labels()
+    order = [1, 2, 3, 0]
+    handles = [handles[idx] for idx in order]
+    labels = [labels[idx] for idx in order]
+    if key == "RF17":
+        ax.legend(handles, labels, loc=legend_loc)
+    ax.text(
+        0.02,
+        0.95,
+        f"{l}",
+        ha="left",
+        va="top",
+        transform=ax.transAxes,
+    )
+    ax.grid()
+
+    ax.set(title=f"{key.replace('1', ' 1')} (n = {len(ecrad_plot.to_numpy().flatten()):.0f})")
+
+axs[0].set(ylabel="Probability density function")
+figname = (f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
+           f"_below_cloud_cosine_dependence"
+           f"_all_columns_fu.pdf")
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
