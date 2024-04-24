@@ -66,6 +66,11 @@ ecrad_versions = ["v13.2", "v15", "v15.1", "v16", "v17", "v18.1", "v19.1", "v20"
 
 left, right, bottom, top = 0, 1000000, -1000000, 0
 sat_img_extent = (left, right, bottom, top)
+# read in dropsonde data
+dropsonde_path = f"{h.get_path('all', campaign=campaign, instrument='dropsondes')}/Level_3"
+dropsonde_file = "merged_HALO_P5_beta_v2.nc"
+dds = xr.open_dataset(f"{dropsonde_path}/{dropsonde_file}")
+
 for key in keys:
     flight = meta.flight_names[key]
     date = flight[9:17]
@@ -75,15 +80,12 @@ for key in keys:
     ifs_path = f"{h.get_path('ifs', flight, campaign)}/{date}"
     ecrad_path = f"{h.get_path('ecrad', flight, campaign)}/{date}"
     varcloud_path = h.get_path("varcloud", flight, campaign)
-    dropsonde_path = h.get_path("dropsondes", flight, campaign)
-    dropsonde_path = f"{dropsonde_path}/Level_1" if key == "RF17" else f"{dropsonde_path}/Level_2"
 
     # filenames
     bahamas_file = f"HALO-AC3_HALO_BAHAMAS_{date}_{key}_v1_JR.nc"
     bacardi_file = f"HALO-AC3_HALO_BACARDI_BroadbandFluxes_{date}_{key}_R1_JR.nc"
     ifs_file = f"ifs_{date}_00_ml_O1280_processed.nc"
     varcloud_file = [f for f in os.listdir(varcloud_path) if f.endswith(".nc")][0]
-    dropsonde_files = [f for f in os.listdir(dropsonde_path) if f.endswith(".nc")]
     sat_url = f'https://gibs.earthdata.nasa.gov/wms/epsg3413/best/wms.cgi?\
 version=1.3.0&service=WMS&request=GetMap&\
 format=image/png&STYLE=default&bbox={left},{bottom},{right},{top}&CRS=EPSG:3413&\
@@ -96,15 +98,7 @@ HEIGHT=8192&WIDTH=8192&TIME={urldate}&layers=MODIS_Terra_CorrectedReflectance_Ba
     # read in results of albedo experiment
     albedo_dfs[key] = pd.read_csv(f"{plot_path}/{flight}_boxplot_data.csv")
 
-    # read in dropsonde data
-    dropsondes = dict()
-    for file in dropsonde_files:
-        k = file[-11:-5] if key == "RF17" else file[27:35].replace("_", "")
-        dropsondes[k] = xr.open_dataset(f"{dropsonde_path}/{file}")
-        if key == "RF18":
-            dropsondes[k]["ta"] = dropsondes[k].ta - 273.15
-            dropsondes[k]["rh"] = dropsondes[k].rh * 100
-    dropsonde_ds[key] = dropsondes
+    dropsonde_ds[key] = dds.where(dds.launch_time.dt.date == pd.to_datetime(date).date(), drop=True)
 
     # read in satellite image
     sat_imgs[key] = io.imread(sat_url)
@@ -731,14 +725,15 @@ ax.plot(ins_hl.IRS_LON[::100], ins_hl.IRS_LAT[::100], c=cbc[1],
         zorder=400, transform=ccrs.PlateCarree())
 
 # plot dropsonde locations - 11 April
-ds_dict = dropsonde_ds["RF17"]
-for i, ds in enumerate(ds_dict.values()):
-    ds["alt"] = ds.alt / 1000  # convert altitude to km
-    launch_time = pd.to_datetime(ds.launch_time.to_numpy())
-    x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-    cross = ax.plot(x, y, "x", color="orangered", markersize=4, label="Dropsonde", transform=data_crs,
-                    zorder=450)
-    ax.text(x, y, f"{launch_time:%H:%M}", c="k", fontsize=7, transform=data_crs, zorder=500,
+ds_ds = dropsonde_ds["RF17"]
+x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
+launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
+cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
+                   transform=data_crs,
+                   zorder=450)
+for i, lt in enumerate(launch_times):
+    ax.text(x[i], y[i], f"{launch_times[i]:%H:%M}", c="k", fontsize=7,
+            transform=data_crs, zorder=500,
             path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # plot trajectories 12 April in second row first column
@@ -837,17 +832,15 @@ ax.plot(ins_hl.IRS_LON[::100], ins_hl.IRS_LAT[::100], c=cbc[1],
         zorder=400, transform=ccrs.PlateCarree())
 
 # plot dropsonde locations - 12 April
-ds_dict = dropsonde_ds["RF18"]
-for i, ds in enumerate(ds_dict.values()):
-    launch_time = pd.to_datetime(ds.time[0].to_numpy())
-    x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-    cross = ax.plot(x, y, "x", color="orangered", markersize=4, transform=data_crs, zorder=450)
-for i in [-4]:
-    ds = list(ds_dict.values())[i]
-    launch_time = pd.to_datetime(ds.time[-1].to_numpy())
-    x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-    ax.text(x, y, f"{launch_time:%H:%M}", color="k", fontsize=7, transform=data_crs, zorder=500,
-            path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
+ds_ds = dropsonde_ds["RF18"]
+x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
+launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
+cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
+                   transform=data_crs,
+                   zorder=450)
+ax.text(x[10], y[10], f"{launch_times[10]:%H:%M}", c="k", fontsize=7,
+        transform=data_crs, zorder=500,
+        path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # make legend for flight track and dropsondes
 labels = ["HALO flight track", "Case study section",
@@ -855,7 +848,7 @@ labels = ["HALO flight track", "Case study section",
           "Mean sea level pressure (hPa)", "High cloud cover at 12:00 UTC"]
 handles = [plt.plot([], ls="-", color="k")[0],  # flight track
            plt.plot([], ls="-", color=cbc[1])[0],  # case study section
-           cross[0],  # dropsondes
+           cross,  # dropsondes
            plt.plot([], ls="--", color="#332288")[0],  # sea ice edge
            plt.plot([], ls="solid", lw=0.7, color="k")[0],  # isobars
            Patch(facecolor="royalblue", alpha=0.5)]  # cloud cover
@@ -1045,15 +1038,17 @@ ax.plot(ins_hl.IRS_LON[::20], ins_hl.IRS_LAT[::20], c=cbc[1],
         zorder=400, transform=data_crs)
 
 # plot dropsonde locations - 12 April
-ds_dict = dropsonde_ds["RF18"]
-for i in [0, -3, -6, 6, 3]:
-    ds = list(ds_dict.values())[i]
-    launch_time = pd.to_datetime(ds.time[-1].to_numpy())
-    x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-    cross = ax.plot(x, y, "x", color="orangered", markersize=4, transform=data_crs, zorder=450)
-    launch_time = pd.to_datetime(ds.time[-1].to_numpy())
-    x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-    ax.text(x, y, f"{launch_time:%H:%M}", color="k", fontsize=6, transform=data_crs, zorder=500,
+ds_ds = dropsonde_ds["RF18"]
+ds_ds = ds_ds.where(ds_ds.launch_time > pd.Timestamp('2022-04-12 10:30'), drop=True)
+x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
+launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
+for i, lt in enumerate(launch_times):
+    cross = ax.scatter(x[i], y[i], marker="x", c="orangered", s=8,
+                       label="Dropsonde",
+                       transform=data_crs,
+                       zorder=450)
+    ax.text(x[i], y[i], f"{lt:%H:%M}", c="k", fontsize=6,
+            transform=data_crs, zorder=500,
             path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 figname = f"{plot_path}/HALO-AC3_RF18_fligh_track_trajectories_plot_overview_zoom.png"
@@ -1083,15 +1078,9 @@ for i, key in enumerate(keys):
     t_switch = times_dt[0] + (times_dt[-1] - times_dt[0]) / 2
     # Air temperature
     ds_list = list()
-    for k in times:
-        ds = ds_plot[k]
-        var = "tdry" if key == "RF17" else "ta"
-        ds = ds.where((~np.isnan(ds[var]) & ~np.isnan(ds.gpsalt)), drop=True)
-        ds["rh_ice"] = met.relative_humidity_water_to_relative_humidity_ice(ds.rh, ds[var])
-        t_array = xr.DataArray(ds[var].to_numpy(), coords=dict(alt=ds.gpsalt.to_numpy()), name="t")
-        rh_ice_array = xr.DataArray(ds.rh_ice.to_numpy(), coords=dict(alt=ds.gpsalt.to_numpy()), name="rh_ice")
-        dataset = xr.merge([t_array, rh_ice_array])
-        ds_list.append(dataset)
+    ds = ds_plot.where(ds_plot.launch_time.isin(times_dt), drop=True)
+    ds["rh_ice"] = met.relative_humidity_water_to_relative_humidity_ice(ds.rh, ds["ta"])
+    # TODO: Update to new dropsonde file
     d1_t, d1_rh_ice = list(), list()
     d2_t, d2_rh_ice = list(), list()
     for t in ifs_plot.time:
@@ -1147,11 +1136,12 @@ for i, key in enumerate(keys):
         ax.plot(ifs_p.temperature_hl - 273.15, ifs_p.press_height_hl / 1000, color="grey", lw=0.5)
     ds_plot = dropsonde_ds[key]
     times = ["104205", "110137"] if key == "RF17" else ["110321", "110823", "111442", "112014", "112524"]
-    for k in times:
-        ds = ds_plot[k]
-        var = "tdry" if key == "RF17" else "ta"
-        ds = ds.where(~np.isnan(ds[var]), drop=True)
-        ax.plot(ds[var], ds.gpsalt / sf, label=f"DS {k[:2]}:{k[2:4]} UTC", lw=2)
+    date = "20220411" if key == "RF17" else "20220412"
+    times_dt = pd.to_datetime([date + t for t in times], format="%Y%m%d%H%M%S")
+    for k in times_dt:
+        ds = ds_plot.where(ds_plot.launch_time == k, drop=True)
+        ds = ds.where(~np.isnan(ds["ta"]), drop=True)
+        ax.plot(ds["ta"][0] - 273.15, ds.alt / sf, label=f"DS {k:%H:%M} UTC", lw=2)
     ax.set(xlim=(-60, -10), ylim=(0, 12), xlabel="Air temperature (°C)", title=f"{key}")
     ax.xaxis.set_major_locator(mticker.MultipleLocator(base=10))
     ax.plot([], color="grey", label="IFS profiles")
@@ -1167,12 +1157,11 @@ for i, key in enumerate(keys):
         rh_ice = met.relative_humidity_water_to_relative_humidity_ice(rh * 100, ifs_p.t - 273.15)
         ax.plot(rh_ice, ifs_p.press_height_full / 1000, color="grey", lw=0.5)
     ds_plot = dropsonde_ds[key]
-    times = ["104205", "110137"] if key == "RF17" else ["110321", "110823", "111442", "112014", "112524"]
-    for k in times:
-        ds = ds_plot[k]
+    for k in times_dt:
+        ds = ds_plot.where(ds_plot.launch_time == k, drop=True)
         ds = ds.where(~np.isnan(ds.rh), drop=True)
-        ax.plot(met.relative_humidity_water_to_relative_humidity_ice(ds.rh, ds[var]),
-                ds.gpsalt / sf, label=f"DS {k[:2]}:{k[2:4]} UTC", lw=2)
+        ax.plot(met.relative_humidity_water_to_relative_humidity_ice(ds.rh * 100, ds["ta"] - 273.15)[0],
+                ds.alt / sf, label=f"DS {k:%H:%M} UTC", lw=2)
     ax.set(xlim=(0, 130), ylim=(0, 12), xlabel="Relative humidity over ice (%)", title=f"{key}")
     ax.xaxis.set_major_locator(mticker.MultipleLocator(base=25))
     ax.plot([], color="grey", label="IFS profiles")
