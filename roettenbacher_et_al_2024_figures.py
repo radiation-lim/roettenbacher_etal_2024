@@ -55,8 +55,10 @@ plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figur
 h.make_dir(plot_path)
 trajectory_path = f"{h.get_path('trajectories', campaign=campaign)}/selection_CC_and_altitude"
 keys = ["RF17", "RF18"]
-ecrad_versions = ["v13.2", "v15", "v15.1", "v16", "v17", "v18.1", "v19.1", "v20", "v21", "v28", "v29",
-                  "v30.1", "v31.1", "v32.1", "v33", "v34", "v35", "v36", "v37", "v38", "v39.2", "v40.2"]
+ecrad_versions = [f'v{v}' for v in
+                  [13.2, 15, 15.1, 16, 16.1, 17, 18.1, 19.1, 20, 21, 28, 28.1,
+                   29, 30.1, 31.1, 32.1, 33, 34, 35, 36, 37, 38, 39.2,
+                   40.2, 41.2, 42.2]]
 
 # %% read in data
 (
@@ -1975,9 +1977,10 @@ figname = f'{plot_path}/HALO-AC3_RF17_RF18_MODIS_Bands367_flight_track.pdf'
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
-# %% plot reice with and without cosine dependence for case study clouds
+# %% plot reice with and without cosine dependence and using VarCloud IWC as input for case study clouds
 plt.rc("font", size=9)
-legend_labels = ["Off", "On"]
+legend_labels = ["Off (IWC IFS)", "On (IWC IFS)", "Off (IWC VarCloud)", "On (IWC VarCloud)"]
+linestyles = ['solid', 'solid', 'dashed', 'dashed']
 binsizes = dict(iwc=1, reice=4)
 binedges = dict(iwc=20, reice=100)
 text_loc_x = 0.03
@@ -1988,9 +1991,9 @@ _, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained"
 # left panel - RF17 re_ice
 ax = axs[0]
 plot_ds = ecrad_orgs['RF17']
-sel_time = slices['RF17']['case']
+sel_time = slices['RF17']['below']
 bins = np.arange(0, binedges["reice"], binsizes["reice"])
-for i, v in enumerate(["v39.2", "v15.1"]):
+for i, v in enumerate(["v39.2", "v15.1", "v41.2", "v16.1"]):
     pds = plot_ds[v].re_ice.sel(time=sel_time).to_numpy().flatten() * 1e6
     pds = pds[~np.isnan(pds)]
     ax.hist(
@@ -1998,6 +2001,7 @@ for i, v in enumerate(["v39.2", "v15.1"]):
         bins=bins,
         label=legend_labels[i] + f" (n={len(pds)})",
         color=cbc[i],
+        linestyle=linestyles[i],
         histtype="step",
         density=True,
         lw=2,
@@ -2017,9 +2021,9 @@ ax.legend(title='Cosine dependence')
 # right panel - RF18 re_ice
 ax = axs[1]
 plot_ds = ecrad_orgs['RF18']
-sel_time = slices['RF18']['case']
+sel_time = slices['RF18']['below']
 bins = np.arange(0, binedges["reice"], binsizes["reice"])
-for i, v in enumerate(["v39.2", "v15.1"]):
+for i, v in enumerate(["v39.2", "v15.1", "v41.2", "v16.1"]):
     pds = plot_ds[v].re_ice.sel(time=sel_time).to_numpy().flatten() * 1e6
     pds = pds[~np.isnan(pds)]
     ax.hist(
@@ -2027,6 +2031,7 @@ for i, v in enumerate(["v39.2", "v15.1"]):
         bins=bins,
         label=legend_labels[i] + f" (n={len(pds)})",
         color=cbc[i],
+        linestyle=linestyles[i],
         histtype="step",
         density=True,
         lw=2,
@@ -2051,12 +2056,12 @@ plt.close()
 transmissivity_stats = list()
 plt.rc("font", size=9)
 label = ["(a)", "(b)"]
-legend_labels = ["Cosine", "No cosine"]
+legend_labels = ["Cosine", "No cosine", "IWC VarCloud", "IWC VarCloud\nno cosine"]
 ylims = (0, 36)
 legend_loc = 3
 binsize = 0.01
 xlabel = "Solar Transmissivity"
-color = [cbc[1], cbc[5]]
+color = [cbc[1], cbc[4], cbc[5], cbc[2]]
 _, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
 for i, key in enumerate(keys):
     ax = axs[i]
@@ -2076,7 +2081,7 @@ for i, key in enumerate(keys):
     ax.axvline(bacardi_plot.mean(), color=cbc[0], lw=3, ls="--")
     ax.plot([], ls="--", color="k", label="Mean")  # label for means
 
-    for ii, v in enumerate(["v15.1", "v39.2"]):
+    for ii, v in enumerate(["v15.1", "v39.2"]):#, "v16.1", "v42.2"]):
         v_name = legend_labels[ii]
         ecrad_ds = ecrad_orgs[key][v].sel(time=slices[key]["below"])
         height_sel = ecrad_ds["aircraft_level"]
@@ -2100,7 +2105,7 @@ for i, key in enumerate(keys):
         xlim=(0.45, 1)
     )
     handles, labels = ax.get_legend_handles_labels()
-    order = [1, 2, 3, 0]
+    order = [1, 2, 3, 0]  # [1, 2, 3, 4, 5, 0]
     handles = [handles[idx] for idx in order]
     labels = [labels[idx] for idx in order]
     if key == "RF17":
@@ -2124,3 +2129,4 @@ figname = (f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_ab
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
+
