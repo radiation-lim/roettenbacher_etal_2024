@@ -90,6 +90,7 @@ for key in keys:
     bacardi_file = f"HALO-AC3_HALO_BACARDI_BroadbandFluxes_{date}_{key}_R1_JR.nc"
     ifs_file = f"ifs_{date}_00_ml_O1280_processed.nc"
     varcloud_file = [f for f in os.listdir(varcloud_path) if f.endswith(".nc")][0]
+    satfile = f'{save_path}/{key}_MODIS_Terra_CorrectedReflectance_Bands367.png'
     sat_url = f'https://gibs.earthdata.nasa.gov/wms/epsg3413/best/wms.cgi?\
 version=1.3.0&service=WMS&request=GetMap&\
 format=image/png&STYLE=default&bbox={left},{bottom},{right},{top}&CRS=EPSG:3413&\
@@ -105,7 +106,10 @@ HEIGHT=8192&WIDTH=8192&TIME={urldate}&layers=MODIS_Terra_CorrectedReflectance_Ba
     dropsonde_ds[key] = dds.where(dds.launch_time.dt.date == pd.to_datetime(date).date(), drop=True)
 
     # read in satellite image
-    # sat_imgs[key] = io.imread(sat_url)
+    try:
+        sat_imgs[key] = io.imread(satfile)
+    except FileNotFoundError:
+        sat_imgs[key] = io.imread(sat_url)
 
     # read in ifs data
     ifs = xr.open_dataset(f"{ifs_path}/{ifs_file}")
@@ -537,8 +541,8 @@ plt.close()
 
 # %% plot IFS cloud fraction lidar/mask comparison
 var = 'cloud_fraction'
-plt.rc("font", size=7)
-fig, axs = plt.subplots(2, 1, figsize=(16 * h.cm, 9 * h.cm), layout="constrained")
+plt.rc("font", size=10)
+fig, axs = plt.subplots(2, 1, figsize=(18 * h.cm, 11 * h.cm), layout="constrained")
 for i, key in enumerate(keys):
     ax = axs[i]
     ds = ecrad_dicts[key]["v15"].sel(time=slices[key]["case"])
@@ -584,10 +588,10 @@ for i, key in enumerate(keys):
 
 # place colorbar for both flights
 fig.colorbar(pcm, ax=axs[:2], label=f"IFS {h.cbarlabels[var].lower()} {h.plot_units[var]}", pad=0.001)
-axs[0].legend()
+axs[0].legend(fontsize=8)
 axs[0].set_xlabel("")
-axs[0].text(0.03, 0.88, "(a) RF 17", transform=axs[0].transAxes, bbox=dict(boxstyle="Round", fc="white"))
-axs[1].text(0.03, 0.88, "(b) RF 18", transform=axs[1].transAxes, bbox=dict(boxstyle="Round", fc="white"))
+axs[0].text(0.01, 0.85, "(a) RF 17", transform=axs[0].transAxes, bbox=dict(boxstyle="Round", fc="white"))
+axs[1].text(0.01, 0.85, "(b) RF 18", transform=axs[1].transAxes, bbox=dict(boxstyle="Round", fc="white"))
 
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_{var}_radar_lidar_mask.pdf"
 plt.savefig(figname, dpi=300)
@@ -609,9 +613,9 @@ plt_sett = {
 data_crs = ccrs.PlateCarree()
 map_crs = ccrs.NorthPolarStereo()
 
-plt.rc("font", size=8)
+plt.rc("font", size=10)
 fig, axs = plt.subplots(1, 2,
-                        figsize=(17 * h.cm, 9 * h.cm),
+                        figsize=(17.75 * h.cm, 9.5 * h.cm),
                         subplot_kw={"projection": map_crs},
                         layout="constrained")
 
@@ -620,7 +624,7 @@ ax = axs[0]
 ax.coastlines(alpha=0.5)
 xlim = (-1200000, 1200000)
 ylim = (-2500000, 50000)
-ax.set(title="(a) RF 17")
+ax.set_title("(a) RF 17 - 11 April 2022", fontsize=10)
 # ax.set_extent([-30, 40, 65, 90], crs=map_crs)
 ax.set_extent([xlim[0], xlim[1], ylim[0], ylim[1]], crs=map_crs)
 gl = ax.gridlines(crs=data_crs, draw_labels=True, linewidth=1, color='gray', alpha=0.5,
@@ -636,7 +640,7 @@ pressure_levels = np.arange(900, 1125, 5)
 press = ifs.mean_sea_level_pressure / 100  # conversion to hPa
 cp = ax.tricontour(ifs.lon, ifs.lat, press, levels=pressure_levels, colors='k', linewidths=0.5,
                    linestyles='solid', alpha=1, transform=data_crs)
-cp.clabel(fontsize=5, inline=1, inline_spacing=4, fmt='%i', rightside_up=True, use_clabeltext=True)
+cp.clabel(fontsize=7, inline=1, inline_spacing=4, fmt='%i', rightside_up=True, use_clabeltext=True)
 
 # add seaice edge
 ci_levels = [0.8]
@@ -659,7 +663,7 @@ axins1 = inset_axes(
 )
 plt.colorbar(hcc, cax=axins1, orientation="vertical", ticks=[0.2, 0.4, 0.6, 0.8, 1])
 axins1.yaxis.set_ticks_position("right")
-axins1.set_yticklabels([0.2, 0.4, 0.6, 0.8, 1], size=6,
+axins1.set_yticklabels([0.2, 0.4, 0.6, 0.8, 1], size=8,
                        path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # plot trajectories - 11 April
@@ -722,14 +726,14 @@ cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
                    transform=data_crs,
                    zorder=450)
 for i, lt in enumerate(launch_times):
-    ax.text(x[i], y[i], f"{launch_times[i]:%H:%M}", c="k", fontsize=7,
+    ax.text(x[i], y[i], f"{launch_times[i]:%H:%M}", c="k", fontsize=8,
             transform=data_crs, zorder=500,
             path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # plot trajectories 12 April in second row first column
 ax = axs[1]
 ax.coastlines(alpha=0.5)
-ax.set(title="(b) RF 18")
+ax.set_title("(b) RF 18 - 12 April 2022", fontsize=10)
 ax.set_extent([xlim[0], xlim[1], ylim[0], ylim[1]], crs=map_crs)
 gl = ax.gridlines(crs=data_crs, draw_labels=True, linewidth=1, color='gray', alpha=0.5,
                   linestyle=':', x_inline=False, y_inline=False, rotate_labels=False)
@@ -744,7 +748,7 @@ pressure_levels = np.arange(900, 1125, 5)
 press = ifs.mean_sea_level_pressure / 100  # conversion to hPa
 cp = ax.tricontour(ifs.lon, ifs.lat, press, levels=pressure_levels, colors='k', linewidths=0.5,
                    linestyles='solid', alpha=1, transform=data_crs)
-cp.clabel(fontsize=5, inline=1, inline_spacing=4, fmt='%i', rightside_up=True, use_clabeltext=True)
+cp.clabel(fontsize=7, inline=1, inline_spacing=4, fmt='%i', rightside_up=True, use_clabeltext=True)
 
 # add seaice edge
 ci_levels = [0.8]
@@ -767,7 +771,7 @@ axins1 = inset_axes(
 )
 cb = plt.colorbar(hcc, cax=axins1, orientation="vertical", ticks=[0.2, 0.4, 0.6, 0.8, 1])
 axins1.yaxis.set_ticks_position("right")
-axins1.set_yticklabels([0.2, 0.4, 0.6, 0.8, 1], size=6,
+axins1.set_yticklabels([0.2, 0.4, 0.6, 0.8, 1], size=8,
                        path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # plot trajectories - 12 April
@@ -828,7 +832,7 @@ launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
 cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
                    transform=data_crs,
                    zorder=450)
-ax.text(x[10], y[10], f"{launch_times[10]:%H:%M}", c="k", fontsize=7,
+ax.text(x[10], y[10], f"{launch_times[10]:%H:%M}", c="k", fontsize=8,
         transform=data_crs, zorder=500,
         path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
@@ -1095,9 +1099,10 @@ for i, key in enumerate(keys):
 
 # %% plot temperature and humidity profiles from IFS and from dropsonde
 below_cloud_altitude = dict()
+date_title = ['11 April 2022', '12 April 2022']
 h.set_cb_friendly_colors("petroff_8")
-plt.rc("font", size=7)
-_, axs = plt.subplots(1, 4, figsize=(18 * h.cm, 10 * h.cm), layout="constrained")
+plt.rc("font", size=9)
+_, axs = plt.subplots(1, 4, figsize=(18 * h.cm, 11 * h.cm), layout="constrained")
 for i, key in enumerate(keys):
     below_cloud_altitude[key] = bahamas_ds[key].IRS_ALT.sel(time=slices[key]["below"]).mean(dim="time") / 1000
     ax = axs[i * 2]
@@ -1116,7 +1121,12 @@ for i, key in enumerate(keys):
         ds = ds_plot.where(ds_plot.launch_time == k, drop=True)
         ds = ds.where(~np.isnan(ds["ta"]), drop=True)
         ax.plot(ds["ta"][0] - 273.15, ds.alt / sf, label=f"DS {k:%H:%M} UTC", lw=2)
-    ax.set(xlim=(-60, -10), ylim=(0, 12), xlabel="Air temperature (°C)", title=f"{key}")
+    ax.set(
+        xlim=(-60, -10),
+        ylim=(0, 12),
+        xlabel="Air temperature (°C)",
+    )
+    ax.set_title(f"{key} - {date_title[i]}", fontsize=9)
     ax.xaxis.set_major_locator(mticker.MultipleLocator(base=10))
     ax.plot([], color="grey", label="IFS profiles")
     ax.axhline(below_cloud_altitude[key], c="k")
@@ -1136,11 +1146,16 @@ for i, key in enumerate(keys):
         ds = ds.where(~np.isnan(ds.rh), drop=True)
         ax.plot(met.relative_humidity_water_to_relative_humidity_ice(ds.rh * 100, ds["ta"] - 273.15)[0],
                 ds.alt / sf, label=f"DS {k:%H:%M} UTC", lw=2)
-    ax.set(xlim=(0, 130), ylim=(0, 12), xlabel="Relative humidity over ice (%)", title=f"{key}")
+    ax.set(
+        xlim=(0, 130),
+        ylim=(0, 12),
+        xlabel="Relative humidity \nover ice (%)",
+    )
+    ax.set_title(f"{key} - {date_title[i]}", fontsize=9)
     ax.xaxis.set_major_locator(mticker.MultipleLocator(base=25))
     ax.plot([], color="grey", label="IFS profiles")
     ax.axhline(below_cloud_altitude[key], c="k")
-    ax.legend()
+    ax.legend(fontsize=7)
     ax.grid()
 
 axs[0].set_ylabel("Altitude (km)")
@@ -1150,10 +1165,58 @@ axs[2].text(0.02, 0.95, "(c)", transform=axs[2].transAxes)
 axs[3].text(0.02, 0.95, "(d)", transform=axs[3].transAxes)
 
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_ifs_dropsonde_t_rh.pdf"
-plt.savefig(figname, dpi=300, bbox_inches="tight")
+plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 h.set_cb_friendly_colors("petroff_6")
+
+# %% plot scatter plot of above cloud measurements and simulations
+plt.rc("font", size=10)
+label = ["(a)", "(b)"]
+date_title = ['11 April 2022', '12 April 2022']
+for v in ["v15.1"]:
+    _, axs = plt.subplots(1, 2, figsize=(18 * h.cm, 9 * h.cm),
+                          layout='constrained')
+    for i, key in enumerate(keys):
+        ax = axs[i]
+        above_sel = (bahamas_ds[key].IRS_ALT > 11000).resample(time="1Min").first()
+        bacardi_res = bacardi_ds_res[key]
+        bacardi_plot = bacardi_res.where(bacardi_res.alt > 11000)
+        ecrad_ds = ecrad_dicts[key][v]
+        height_sel = ecrad_dicts[key][v].aircraft_level
+        ecrad_plot = ecrad_ds.flux_dn_sw.isel(half_level=height_sel).where(above_sel)
+
+        # actual plotting
+        rmse = np.sqrt(np.mean((bacardi_plot["F_down_solar_diff"] - ecrad_plot) ** 2)).to_numpy()
+        bias = np.nanmean((bacardi_plot["F_down_solar_diff"] - ecrad_plot).to_numpy())
+        ax.scatter(bacardi_plot.F_down_solar_diff, ecrad_plot, color=cbc[3])
+        ax.axline((0, 0), slope=1, color="k", lw=2, transform=ax.transAxes)
+        ax.set(
+            aspect="equal",
+            xlabel="Measured irradiance (W$\,$m$^{-2}$)",
+            ylabel="Simulated irradiance (W$\,$m$^{-2}$)",
+            xlim=(175, 525),
+            ylim=(175, 525),
+        )
+        ax.grid()
+        ax.text(
+            0.025,
+            0.95,
+            f"{label[i]}\n"
+            f"n= {sum(~np.isnan(bacardi_plot['F_down_solar'])):.0f}\n"
+            f"RMSE: {rmse:.0f} {h.plot_units['flux_dn_sw']}\n"
+            f"Bias: {bias:.0f} {h.plot_units['flux_dn_sw']}",
+            ha="left",
+            va="top",
+            transform=ax.transAxes,
+            bbox=dict(fc="white", ec="black", alpha=0.8, boxstyle="round"),
+        )
+        ax.set_title(f'{key.replace("1", " 1")} - {date_title[i]}', fontsize=10)
+
+    figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_f_down_solar_above_cloud_all_{v}.pdf"
+    plt.savefig(figname, dpi=300)
+    plt.show()
+    plt.close()
 
 # %% plot PDF of IWC, IWP and re_ice
 plt.rc("font", size=9)
@@ -1192,10 +1255,11 @@ for i, v in enumerate(["v36", "v15.1"]):
 ax.legend()
 ax.grid()
 ax.text(text_loc_x, text_loc_y, "(a)", transform=ax.transAxes)
-ax.set(title=f"RF 17",
-       ylabel=f"Probability density function",
-       xlabel=f"Ice water content ({h.plot_units['iwc']})",
-       ylim=ylims["iwc"])
+ax.set(
+    ylabel=f"Probability density function",
+    xlabel=f"Ice water content ({h.plot_units['iwc']})",
+    ylim=ylims["iwc"])
+ax.set_title("RF 17 - 11 April 2022", fontsize=9)
 ax.yaxis.set_major_locator(mticker.MultipleLocator(0.05))
 
 # middle left panel - RF17 IWP
@@ -1283,10 +1347,11 @@ for i, v in enumerate(["v36", "v15.1"]):
 ax.legend()
 ax.grid()
 ax.text(text_loc_x, text_loc_y, "(b)", transform=ax.transAxes)
-ax.set(title=f"RF 18",
-       ylabel=f"",
-       xlabel=f"Ice water content ({h.plot_units['iwc']})",
-       ylim=ylims["iwc"])
+ax.set(
+    ylabel=f"",
+    xlabel=f"Ice water content ({h.plot_units['iwc']})",
+    ylim=ylims["iwc"])
+ax.set_title("RF 18 - 12 April 2022", fontsize=9)
 ax.yaxis.set_major_locator(mticker.MultipleLocator(0.05))
 
 # middle right panel - RF18 IWP
@@ -1347,7 +1412,7 @@ ax.set(ylabel="",
        ylim=ylims["reice"])
 
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_iwp_re_ice_pdf_case_studies.pdf"
-plt.savefig(figname, dpi=300, bbox_inches="tight")
+plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
@@ -1733,10 +1798,10 @@ plt.show()
 plt.close()
 
 # %% plot PDF of IWC from IFS above cloud for 11 and 12 UTC
-plt.rc("font", size=9)
+plt.rc("font", size=10)
 legend_labels = ["11 UTC", "12 UTC"]
 binsizes = dict(iwc=1, reice=4)
-_, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
+_, axs = plt.subplots(1, 2, figsize=(18 * h.cm, 10 * h.cm), layout="constrained")
 ylims = {"iwc": (0, 0.22), "reice": (0, 0.095)}
 # left panel - RF17 IWC
 ax = axs[0]
@@ -1765,11 +1830,11 @@ ax.set(ylabel=f"Probability density function",
        xlabel=f"Ice water content ({h.plot_units['iwc']})",
        ylim=ylims["iwc"],
        xticks=range(0, 21, 5),
-       title="")
-ax.text(0.03, 0.93,
-        f"(a) RF 17",
+       )
+ax.set_title("RF 17 - 11 April 2022", fontsize=10)
+ax.text(0.05, 0.93,
+        f"(a)",
         transform=ax.transAxes,
-        bbox=dict(boxstyle="Round", fc="white"),
         )
 
 # right panel - RF18 IWC
@@ -1798,15 +1863,15 @@ ax.set(ylabel=f"",
        xlabel=f"Ice water content ({h.plot_units['iwc']})",
        ylim=ylims["iwc"],
        xticks=range(0, 21, 5),
-       title="")
-ax.text(0.03, 0.93,
-        f"(b) RF 18",
+       )
+ax.text(0.05, 0.93,
+        f"(b)",
         transform=ax.transAxes,
-        bbox=dict(boxstyle="Round", fc="white"),
         )
+ax.set_title("RF 18 - 12 April 2022", fontsize=10)
 
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_11_vs_12_pdf_case_studies.pdf"
-plt.savefig(figname, dpi=300, bbox_inches="tight")
+plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
@@ -1966,6 +2031,7 @@ plt.show()
 plt.close()
 # %% plot satellite image together with flight track
 labels = ['(a)', '(b)']
+date_title = ['11 April 2022', '12 April 2022']
 data_crs = ccrs.PlateCarree()
 plot_crs = ccrs.NorthPolarStereo(central_longitude=-45)
 extent = sat_img_extent
@@ -1981,21 +2047,22 @@ for i, key in enumerate(keys):
     ax.plot(bahamas_ds[key].IRS_LON, bahamas_ds[key].IRS_LAT,
             color='k', transform=data_crs, label='HALO flight track')
     # dropsondes
-    for ds in dropsonde_ds[key].values():
-        launch_time = pd.to_datetime(ds.launch_time.to_numpy()) if key == 'RF17' else pd.to_datetime(ds.time[0].to_numpy())
-        x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-        cross = ax.plot(x, y, 'X', color=cbc[0], markersize=7, transform=data_crs,
-                        zorder=450)
-        if key == 'RF17':
-            ax.text(x, y, f'{launch_time:%H:%M}', c='k', transform=data_crs, zorder=500,
+    ds = dropsonde_ds[key]
+    launch_time = pd.to_datetime(ds.launch_time.to_numpy())
+    x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
+    cross = ax.plot(x, y, 'X', color=cbc[0], markersize=7, transform=data_crs,
+                    zorder=450)
+    if key == 'RF17':
+        for ii, lt in enumerate(launch_time):
+            ax.text(x[ii], y[ii], f'{lt:%H:%M}', c='k', transform=data_crs, zorder=500,
                     path_effects=[patheffects.withStroke(linewidth=0.5, foreground='white')])
-        else:
-            for iii in [3, 9]:
-                ds = list(dropsonde_ds[key].values())[iii]
-                launch_time = pd.to_datetime(ds.time[-1].to_numpy())
-                x, y = ds.lon.mean().to_numpy(), ds.lat.mean().to_numpy()
-                ax.text(x, y, f"{launch_time:%H:%M}", color="k", transform=data_crs, zorder=500,
-                        path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
+    else:
+        ds = ds.where(ds.launch_time.isin(ds.launch_time[[1, 6]]), drop=True)
+        launch_time = pd.to_datetime(ds.launch_time.to_numpy())
+        x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
+        for ii, lt in enumerate(launch_time):
+            ax.text(x[ii], y[ii], f"{lt:%H:%M}", color="k", transform=data_crs, zorder=500,
+                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
     # add legend artist
     ax.plot([], label='Dropsonde', ls='', marker='X', color=cbc[0], markersize=7)
 
@@ -2005,10 +2072,10 @@ for i, key in enumerate(keys):
     gl.right_labels = False
 
     ax.set(
-        title=f'{labels[i]} {key.replace("1", " 1")}',
         xlim=(left, right),
         ylim=(bottom, top),
     )
+    ax.set_title(f'{labels[i]} {key.replace("1", " 1")} - {date_title[i]}', fontsize=10)
 
 
 axs[1].legend()
@@ -2016,16 +2083,17 @@ figname = f'{plot_path}/HALO-AC3_RF17_RF18_MODIS_Bands367_flight_track.pdf'
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
+
 # %% plot reice with and without cosine dependence and using VarCloud IWC as input for case study clouds
-plt.rc("font", size=9)
+plt.rc("font", size=10)
 legend_labels = ["Off (IWC IFS)", "On (IWC IFS)", "Off (IWC VarCloud)", "On (IWC VarCloud)"]
 linestyles = ['solid', 'solid', 'dashed', 'dashed']
 binsizes = dict(iwc=1, reice=4)
 binedges = dict(iwc=20, reice=100)
-text_loc_x = 0.03
+text_loc_x = 0.05
 text_loc_y = 0.95
 ylims = {"iwc": (0, 0.3), "reice": (0, 0.25)}
-_, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
+_, axs = plt.subplots(1, 2, figsize=(18 * h.cm, 10 * h.cm), layout="constrained")
 
 # left panel - RF17 re_ice
 ax = axs[0]
@@ -2048,13 +2116,13 @@ for i, v in enumerate(["v39.2", "v15.1", "v41.2", "v16.1"]):
     print(f"RF17 Mean reice {v}: {pds.mean():.2f}")
 
 ax.grid()
-ax.text(text_loc_x, text_loc_y, "(a) RF 17",
+ax.text(text_loc_x, text_loc_y, "(a)",
         transform=ax.transAxes,
-        bbox=dict(boxstyle="Round", fc="white")
         )
 ax.set(ylabel="Probability density function",
        xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
        ylim=ylims["reice"])
+ax.set_title('RF 17 - 11 April 2024', fontsize=10)
 ax.legend(title='Cosine dependence')
 
 # right panel - RF18 re_ice
@@ -2078,13 +2146,13 @@ for i, v in enumerate(["v39.2", "v15.1", "v41.2", "v16.1"]):
     print(f"RF18 Mean reice {v}: {pds.mean():.2f}")
 
 ax.grid()
-ax.text(text_loc_x, text_loc_y, "(b) RF 18",
+ax.text(text_loc_x, text_loc_y, "(b)",
         transform=ax.transAxes,
-        bbox=dict(boxstyle="Round", fc="white")
         )
 ax.set(ylabel="",
        xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
        ylim=ylims["reice"])
+ax.set_title('RF 18 - 12 April 2024', fontsize=10)
 
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_re_ice_pdf_case_studies_cosine_dependence.pdf"
 plt.savefig(figname, dpi=300)
@@ -2093,7 +2161,7 @@ plt.close()
 
 # %% plot PDF of transmissivity (above cloud simulation) below cloud all columns - cosine dependence
 transmissivity_stats = list()
-plt.rc("font", size=9)
+plt.rc("font", size=10)
 label = ["(a)", "(b)"]
 legend_labels = ["Cosine", "No cosine", "IWC VarCloud", "IWC VarCloud\nno cosine"]
 ylims = (0, 36)
