@@ -1065,50 +1065,34 @@ for i, key in enumerate(keys):
     # calculate time switch for comaprison with IFS
     date = "20220411" if key == "RF17" else "20220412"
     times_dt = pd.to_datetime([date + t for t in times], format="%Y%m%d%H%M%S")
-    t_switch = times_dt[0] + (times_dt[-1] - times_dt[0]) / 2
     # Air temperature
-    ds_list = list()
-    ds = ds_plot.where(ds_plot.launch_time.isin(times_dt), drop=True)
-    ds["rh_ice"] = met.relative_humidity_water_to_relative_humidity_ice(ds.rh, ds["ta"])
-    # TODO: Update to new dropsonde file
+    ds = ds_plot.where(ds_plot.launch_time.isin(times_dt), drop=True)  # select only sondes in the case stuy region
+    # overwrite sonde_id with launch time for easier selection
+    ds = ds.assign_coords(dict(sonde_id=ds.launch_time)).sortby('launch_time')
+    # add rh_ice
+    ds["rh_ice"] = met.relative_humidity_water_to_relative_humidity_ice(ds.rh * 100, ds["ta"] - 273.15)
     d1_t, d1_rh_ice = list(), list()
-    d2_t, d2_rh_ice = list(), list()
     for t in ifs_plot.time:
         ifs_sel = ifs_plot.sel(time=t)
         ifs_sel = ifs_sel.assign_coords(half_level=ifs_sel.press_height_hl, level=ifs_sel.press_height_full)
-        if t < t_switch:
-            ds = ds_list[0]
-            ifs_inp = ifs_sel.interp(half_level=ds.alt)
-            d1_t.append(ds.t - (ifs_inp.temperature_hl - 273))
-            ifs_inp = ifs_sel.interp(level=ds.alt)
-            d1_rh_ice.append(ds.rh_ice - ifs_inp.rh_ice)
-        else:
-            ds = ds_list[1]
-            ifs_inp = ifs_sel.interp(half_level=ds.alt)
-            d2_t.append(ds.t - (ifs_inp.temperature_hl - 273))
-            ifs_inp = ifs_sel.interp(level=ds.alt)
-            d2_rh_ice.append(ds.rh_ice - ifs_inp.rh_ice)
+        ds1 = ds.sel(sonde_id=t, method='nearest')
+        ifs_inp = ifs_sel.interp(half_level=ds1.alt)
+        d1_t.append(ds1.ta - ifs_inp.temperature_hl)
+        ifs_inp = ifs_sel.interp(level=ds1.alt)
+        d1_rh_ice.append(ds1.rh_ice - ifs_inp.rh_ice)
 
     ds1_t_diff = xr.concat(d1_t, dim="time")
     ds1_t_diff.name = "t"
     ds1_rh_ice_diff = xr.concat(d1_rh_ice, dim="time")
     ds1_rh_ice_diff.name = "rh_ice"
     ds1_diff = xr.merge([ds1_t_diff, ds1_rh_ice_diff])
-    ds2_t_diff = xr.concat(d2_t, dim="time")
-    ds2_t_diff.name = "t"
-    ds2_rh_ice_diff = xr.concat(d2_rh_ice, dim="time")
-    ds2_rh_ice_diff.name = "rh_ice"
-    ds2_diff = xr.merge([ds2_t_diff, ds2_rh_ice_diff])
 
-    print(f"{key}: IFS maximum temperature difference from dropsonde at {times[0]}:"
+    print(f"{key}: IFS maximum temperature difference from nearest dropsonde:"
           f" {np.abs(ds1_diff.t).max().to_numpy():.2f} K\n"
-          f"{key}: IFS maximum temperature difference from dropsonde at {times[1]}:"
-          f" {np.abs(ds2_diff.t).max().to_numpy():.2f} K\n"
-          f"{key}: IFS maximum RH_ice difference from dropsonde at {times[0]}:"
+          f"{key}: IFS maximum RH_ice difference from nearest dropsonde:"
           f" {np.abs(ds1_diff.rh_ice).max().to_numpy():.2f} %\n"
-          f"{key}: IFS maximum RH_ice difference from dropsonde at {times[1]}:"
-          f" {np.abs(ds2_diff.rh_ice).max().to_numpy():.2f} %"
           )
+
 # %% plot temperature and humidity profiles from IFS and from dropsonde
 below_cloud_altitude = dict()
 h.set_cb_friendly_colors("petroff_8")
