@@ -23,10 +23,11 @@ import pylim.helpers as h
 import pylim.halo_ac3 as meta
 import pylim.meteorological_formulas as met
 from pylim import ecrad
-import ac3airborne
-from ac3airborne.tools import flightphase
+# import ac3airborne
+# from ac3airborne.tools import flightphase
 import cartopy.crs as ccrs
 import cmasher as cm
+import dill
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -52,6 +53,7 @@ cbc = h.get_cb_friendly_colors("petroff_6")
 # %% set paths
 campaign = "halo-ac3"
 plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figures_review"
+save_path = 'C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/data'
 h.make_dir(plot_path)
 trajectory_path = f"{h.get_path('trajectories', campaign=campaign)}/selection_CC_and_altitude"
 keys = ["RF17", "RF18"]
@@ -103,7 +105,7 @@ HEIGHT=8192&WIDTH=8192&TIME={urldate}&layers=MODIS_Terra_CorrectedReflectance_Ba
     dropsonde_ds[key] = dds.where(dds.launch_time.dt.date == pd.to_datetime(date).date(), drop=True)
 
     # read in satellite image
-    sat_imgs[key] = io.imread(sat_url)
+    # sat_imgs[key] = io.imread(sat_url)
 
     # read in ifs data
     ifs = xr.open_dataset(f"{ifs_path}/{ifs_file}")
@@ -155,29 +157,15 @@ HEIGHT=8192&WIDTH=8192&TIME={urldate}&layers=MODIS_Terra_CorrectedReflectance_Ba
     bacardi_ds[key] = bacardi
 
     # get flight segmentation and select below and above cloud section
-    fl_segments = ac3airborne.get_flight_segments()["HALO-AC3"]["HALO"][f"HALO-AC3_HALO_{key}"]
-    segments = flightphase.FlightPhaseFile(fl_segments)
-    above_cloud, below_cloud = dict(), dict()
-    if key == "RF17":
-        above_cloud["start"] = segments.select("name", "high level 7")[0]["start"]
-        above_cloud["end"] = segments.select("name", "high level 8")[0]["end"]
-        below_cloud["start"] = segments.select("name", "high level 9")[0]["start"]
-        below_cloud["end"] = segments.select("name", "high level 10")[0]["end"]
-        above_slice = slice(above_cloud["start"], above_cloud["end"])
-        below_slice = slice(pd.to_datetime("2022-04-11 11:35"), below_cloud["end"])
-        case_slice = slice(above_cloud["start"], below_cloud["end"])
-    else:
-        above_cloud["start"] = segments.select("name", "polygon pattern 1")[0]["start"]
-        above_cloud["end"] = segments.select("name", "polygon pattern 1")[0]["parts"][-1]["start"]
-        below_cloud["start"] = segments.select("name", "polygon pattern 2")[0]["start"]
-        below_cloud["end"] = segments.select("name", "polygon pattern 2")[0]["end"]
-        above_slice = slice(above_cloud["start"], above_cloud["end"])
-        below_slice = slice(below_cloud["start"], below_cloud["end"])
-        case_slice = slice(above_cloud["start"], below_cloud["end"])
+    loaded_objects = list()
+    filenames = [f'{key}_slices.pkl', f'{key}_above_cloud.pkl', f'{key}_below_cloud.pkl']
+    for filename in filenames:
+        with open(f'{save_path}/{filename}', 'rb') as f:
+            loaded_objects.append(dill.load(f))
 
-    above_clouds[key] = above_cloud
-    below_clouds[key] = below_cloud
-    slices[key] = dict(case=case_slice, above=above_slice, below=below_slice)
+    slices[key] = loaded_objects[0]
+    above_clouds[key] = loaded_objects[1]
+    below_clouds[key] = loaded_objects[2]
 
     # get IFS data for the case study area
     ifs_lat_lon = np.column_stack((ifs.lat, ifs.lon))
@@ -1183,15 +1171,16 @@ plt.show()
 plt.close()
 h.set_cb_friendly_colors("petroff_6")
 
-# %% plot PDF of IWC and re_ice
-plt.rc("font", size=8)
+# %% plot PDF of IWC, IWP and re_ice
+plt.rc("font", size=9)
 legend_labels = ["VarCloud", "IFS"]
-binsizes = dict(iwc=1, reice=4)
-binedges = dict(iwc=20, reice=100)
+binsizes = dict(iwc=1, tiwp=10, reice=4)
+binedges = dict(iwc=20, tiwp=200, reice=100)
 text_loc_x = 0.05
 text_loc_y = 0.9
-_, axs = plt.subplots(2, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
-ylims = {"iwc": (0, 0.3), "reice": (0, 0.095)}
+ylims = {"iwc": (0, 0.3), 'tiwp': (0, 0.115), "reice": (0, 0.095)}
+_, axs = plt.subplots(3, 2, figsize=(18 * h.cm, 15 * h.cm), layout="constrained")
+
 # upper left panel - RF17 IWC
 ax = axs[0, 0]
 plot_ds = ecrad_orgs["RF17"]
@@ -1223,9 +1212,41 @@ ax.set(title=f"RF 17",
        ylabel=f"Probability density function",
        xlabel=f"Ice water content ({h.plot_units['iwc']})",
        ylim=ylims["iwc"])
+ax.yaxis.set_major_locator(mticker.MultipleLocator(0.05))
+
+# middle left panel - RF17 IWP
+ax = axs[1, 0]
+bins = np.arange(0, binedges["tiwp"], binsizes["tiwp"])
+for i, v in enumerate(["v36", "v15.1"]):
+    if v == "v36":
+        pds = plot_ds[v].tiwp
+    else:
+        tiwp, cc = plot_ds[v].tiwp.sel(time=sel_time), plot_ds[v].cloud_fraction.sel(time=sel_time)
+        pds = tiwp
+
+    pds = pds.to_numpy().flatten() * 1e3
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+ax.legend()
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(c)", transform=ax.transAxes)
+ax.set(
+    ylabel=f"Probability density function",
+    xlabel=f"Ice water path ({h.plot_units['iwp']})",
+    ylim=ylims["tiwp"],
+)
+ax.yaxis.set_major_locator(mticker.MultipleLocator(0.02))
 
 # lower left panel - RF17 re_ice
-ax = axs[1, 0]
+ax = axs[2, 0]
 bins = np.arange(0, binedges["reice"], binsizes["reice"])
 for i, v in enumerate(["v36", "v15.1"]):
     if v == "v36":
@@ -1237,15 +1258,16 @@ for i, v in enumerate(["v36", "v15.1"]):
     ax.hist(
         pds,
         bins=bins,
-        label=legend_labels[i] + f" (n={len(pds)})",
+        label=legend_labels[i] + f"\n(n={len(pds)})",
         color=cbc[i],
         histtype="step",
         density=True,
         lw=2,
     )
     print(f"RF17 Mean reice {v}: {pds.mean():.2f}")
+ax.legend()
 ax.grid()
-ax.text(text_loc_x, text_loc_y, "(c)", transform=ax.transAxes)
+ax.text(text_loc_x, text_loc_y, "(e)", transform=ax.transAxes)
 ax.set(ylabel="Probability density function",
        xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
        ylim=ylims["reice"])
@@ -1254,7 +1276,7 @@ ax.set(ylabel="Probability density function",
 ax = axs[0, 1]
 plot_ds = ecrad_orgs["RF18"]
 # sel_time = slice(pd.to_datetime("2022-04-12 11:04"), pd.to_datetime("2022-04-12 11:24"))
-sel_time = slices["RF18"]["below"]
+sel_time = slices["RF18"]["case"]
 bins = np.arange(0, binedges["iwc"], binsizes["iwc"])
 for i, v in enumerate(["v36", "v15.1"]):
     if v == "v36":
@@ -1281,9 +1303,41 @@ ax.set(title=f"RF 18",
        ylabel=f"",
        xlabel=f"Ice water content ({h.plot_units['iwc']})",
        ylim=ylims["iwc"])
+ax.yaxis.set_major_locator(mticker.MultipleLocator(0.05))
+
+# middle right panel - RF18 IWP
+ax = axs[1, 1]
+bins = np.arange(0, binedges["tiwp"], binsizes["tiwp"])
+for i, v in enumerate(["v36", "v15.1"]):
+    if v == "v36":
+        pds = plot_ds[v].tiwp
+    else:
+        tiwp, cc = plot_ds[v].tiwp.sel(time=sel_time), plot_ds[v].cloud_fraction.sel(time=sel_time)
+        pds = tiwp
+
+    pds = pds.to_numpy().flatten() * 1e3
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+ax.legend()
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(d)", transform=ax.transAxes)
+ax.set(
+   ylabel=f"",
+   xlabel=f"Ice water path ({h.plot_units['iwp']})",
+   ylim=ylims["tiwp"],
+   )
+ax.yaxis.set_major_locator(mticker.MultipleLocator(0.02))
 
 # lower right panel - RF18 re_ice
-ax = axs[1, 1]
+ax = axs[2, 1]
 bins = np.arange(0, binedges["reice"], binsizes["reice"])
 for i, v in enumerate(["v36", "v15.1"]):
     if v == "v36":
@@ -1301,13 +1355,14 @@ for i, v in enumerate(["v36", "v15.1"]):
         lw=2,
     )
     print(f"RF18 Mean reice {v}: {pds.mean():.2f}")
+ax.legend()
 ax.grid()
-ax.text(text_loc_x, text_loc_y, "(d)", transform=ax.transAxes)
+ax.text(text_loc_x, text_loc_y, "(f)", transform=ax.transAxes)
 ax.set(ylabel="",
        xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
        ylim=ylims["reice"])
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_re_ice_pdf_case_studies.pdf"
+figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_iwp_re_ice_pdf_case_studies.pdf"
 plt.savefig(figname, dpi=300, bbox_inches="tight")
 plt.show()
 plt.close()
@@ -2130,3 +2185,83 @@ plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
+
+# %% plot PDF comparison of IWP from IFS and VarCloud
+plt.rc("font", size=10)
+legend_labels = ["VarCloud", "IFS"]
+binsizes = dict(iwp=10, iwc=1, reice=4)
+binedges = dict(iwp=200, iwc=20, reice=100)
+text_loc_x = 0.05
+text_loc_y = 0.95
+_, axs = plt.subplots(1, 2, figsize=(17 * h.cm, 10 * h.cm), layout="constrained")
+ylims = {"iwc": (0, 0.3), "reice": (0, 0.095), 'iwp': (0., .11)}
+
+# left panel - RF17 IWP
+ax = axs[0]
+plot_ds = ecrad_orgs["RF17"]
+sel_time = slices["RF17"]["below"]
+bins = np.arange(0, binedges["iwp"], binsizes["iwp"])
+for i, v in enumerate(["v36", "v15.1"]):
+    if v == "v36":
+        pds = plot_ds[v].tiwp
+    else:
+        iwp, cc = plot_ds[v].tiwp.sel(time=sel_time), plot_ds[v].cloud_fraction.sel(time=sel_time)
+        pds = iwp
+
+    pds = pds.to_numpy().flatten() * 1e3
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+ax.legend()
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(a)", transform=ax.transAxes)
+ax.set(title=f"RF 17",
+       ylabel=f"Probability density function",
+       xlabel=f"Ice water path ({h.plot_units['iwp']})",
+       ylim=ylims["iwp"],
+       )
+
+# right panel - RF18 IWP
+ax = axs[1]
+plot_ds = ecrad_orgs["RF18"]
+# sel_time = slice(pd.to_datetime("2022-04-12 11:04"), pd.to_datetime("2022-04-12 11:24"))
+sel_time = slices["RF18"]["below"]
+bins = np.arange(0, binedges["iwp"], binsizes["iwp"])
+for i, v in enumerate(["v36", "v15.1"]):
+    if v == "v36":
+        pds = plot_ds[v].tiwp
+    else:
+        iwp, cc = plot_ds[v].tiwp.sel(time=sel_time), plot_ds[v].cloud_fraction.sel(time=sel_time)
+        pds = iwp
+
+    pds = pds.to_numpy().flatten() * 1e3
+    pds = pds[~np.isnan(pds)]
+    ax.hist(
+        pds,
+        bins=bins,
+        label=legend_labels[i] + f" (n={len(pds)})",
+        color=cbc[i],
+        histtype="step",
+        density=True,
+        lw=2,
+    )
+ax.legend()
+ax.grid()
+ax.text(text_loc_x, text_loc_y, "(b)", transform=ax.transAxes)
+ax.set(title=f"RF 18",
+       ylabel=f"",
+       xlabel=f"Ice water path ({h.plot_units['iwp']})",
+       ylim=ylims["iwp"],
+       )
+
+figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_VarCloud_iwp_pdf_case_studies.pdf"
+plt.savefig(figname, dpi=300)
+plt.show()
+plt.close()
