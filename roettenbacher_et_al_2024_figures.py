@@ -420,13 +420,13 @@ print(f"Range of circle area covered by the 9 gridpoints surrounding the closest
       f"{min_dist * 2 * 1000 / halo_speed / 60:.2f} - {max_dist * 2 * 1000 / halo_speed / 60:.2f} minutes")
 
 # %% plot BACARDI six panel plot with above and below cloud measurements and transmissivity - solar
-plt.rc("font", size=8)
+plt.rc("font", size=9)
 xlims = [(0, 240), (0, 320)]
 ylim_transmissivity = (0.45, 1)
 ylim_irradiance = [(100, 279), (80, 260)]
 label_xy = (0.03, 0.9)
 box_xy = (0.98, 0.9)
-_, axs = plt.subplots(3, 2, figsize=(17 * h.cm, 15 * h.cm))
+_, axs = plt.subplots(3, 2, figsize=(18 * h.cm, 15 * h.cm))
 
 # upper left panel - RF17 BACARDI F above cloud
 ax = axs[0, 0]
@@ -439,7 +439,7 @@ plot_ds["cum_distance"] = plot_ds["distance"].cumsum() / 1000
 # bacardi measurements
 for var in ["F_down_solar", "F_up_solar"]:
     ax.plot(plot_ds.cum_distance, plot_ds[var], label=f"{h.bacardi_labels[var]}")
-ax.legend(loc=4, fontsize=9)
+ax.legend(loc=4, ncol=2)
 ax.grid()
 ax.text(box_xy[0], box_xy[1], "Above cloud", ha="right",
         transform=ax.transAxes, bbox=dict(boxstyle="Round", fc="white"))
@@ -502,8 +502,8 @@ plot_ds = bacardi_ds["RF18"].sel(time=slices["RF18"]["below"])
 plot_ds["distance"] = bahamas_ds["RF18"]["distance"].sel(time=slices["RF18"]["below"])
 # set first distance to 0
 plot_ds["distance"][0] = 0
-# sum up distances to generate a distance axis and convert to km, flip the distance to show travel in other direction
-cum_distance = np.flip(plot_ds["distance"].cumsum().to_numpy() / 1000)
+# sum up distances to generate a distance axis and convert to km
+cum_distance = plot_ds["distance"].cumsum().to_numpy() / 1000
 # bacardi measurements
 for var in ["F_down_solar", "F_up_solar"]:
     ax.plot(cum_distance, plot_ds[var], label=f"{h.bacardi_labels[var]}")
@@ -527,7 +527,7 @@ ax.set(xlabel="Distance (km)",
 
 # set a-f labels
 for ax, label in zip(axs.flatten(), ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)"]):
-    ax.text(label_xy[0], label_xy[1], label, transform=ax.transAxes, fontsize=8)
+    ax.text(label_xy[0], label_xy[1], label, transform=ax.transAxes)
 
 plt.tight_layout()
 figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_BACARDI_case_studies_6panel.pdf"
