@@ -612,19 +612,27 @@ plt_sett = {
 }
 data_crs = ccrs.PlateCarree()
 map_crs = ccrs.NorthPolarStereo()
+sat_crs = ccrs.NorthPolarStereo(central_longitude=-45)
+extent = sat_img_extent
 
 plt.rc("font", size=10)
-fig, axs = plt.subplots(1, 2,
-                        figsize=(17.75 * h.cm, 9.5 * h.cm),
-                        subplot_kw={"projection": map_crs},
-                        layout="constrained")
+fig, axs = plt.subplot_mosaic(
+    "AB;CD",
+    figsize=(18 * h.cm, 18.5 * h.cm),
+    per_subplot_kw={
+        ("A", "B"): {"projection": map_crs},
+        ("C", "D"): {"projection": sat_crs}
+    },
+    layout="constrained"
+)
 
 # plot trajectory map 11 April in first row and first column
-ax = axs[0]
+ax = axs["A"]
 ax.coastlines(alpha=0.5)
 xlim = (-1200000, 1200000)
 ylim = (-2500000, 50000)
-ax.set_title("(a) RF 17 - 11 April 2022", fontsize=10)
+ax.text(0, 1.03, "(a)", transform=ax.transAxes)
+ax.set_title("RF 17 - 11 April 2022", fontsize=10)
 # ax.set_extent([-30, 40, 65, 90], crs=map_crs)
 ax.set_extent([xlim[0], xlim[1], ylim[0], ylim[1]], crs=map_crs)
 gl = ax.gridlines(crs=data_crs, draw_labels=True, linewidth=1, color='gray', alpha=0.5,
@@ -721,19 +729,15 @@ ax.plot(ins_hl.IRS_LON[::100], ins_hl.IRS_LAT[::100], c=cbc[1],
 # plot dropsonde locations - 11 April
 ds_ds = dropsonde_ds["RF17"]
 x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
-launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
-cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
+cross = ax.scatter(x, y, marker="x", c=cbc[2], s=8, label="Dropsonde",
                    transform=data_crs,
                    zorder=450)
-for i, lt in enumerate(launch_times):
-    ax.text(x[i], y[i], f"{launch_times[i]:%H:%M}", c="k", fontsize=8,
-            transform=data_crs, zorder=500,
-            path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 # plot trajectories 12 April in second row first column
-ax = axs[1]
+ax = axs["B"]
 ax.coastlines(alpha=0.5)
-ax.set_title("(b) RF 18 - 12 April 2022", fontsize=10)
+ax.text(0, 1.03, "(b)", transform=ax.transAxes)
+ax.set_title("RF 18 - 12 April 2022", fontsize=10)
 ax.set_extent([xlim[0], xlim[1], ylim[0], ylim[1]], crs=map_crs)
 gl = ax.gridlines(crs=data_crs, draw_labels=True, linewidth=1, color='gray', alpha=0.5,
                   linestyle=':', x_inline=False, y_inline=False, rotate_labels=False)
@@ -829,12 +833,52 @@ ax.plot(ins_hl.IRS_LON[::100], ins_hl.IRS_LAT[::100], c=cbc[1],
 ds_ds = dropsonde_ds["RF18"]
 x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
 launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
-cross = ax.scatter(x, y, marker="x", c="orangered", s=8, label="Dropsonde",
+cross = ax.scatter(x, y, marker="x", c=cbc[2], s=10, label="Dropsonde",
                    transform=data_crs,
                    zorder=450)
 ax.text(x[10], y[10], f"{launch_times[10]:%H:%M}", c="k", fontsize=8,
         transform=data_crs, zorder=500,
         path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
+
+# RF17/RF18 satellite image
+sat_axs = list(map(axs.get, ["C", "D"]))
+label = ["(c)", "(d)"]
+for i, key in enumerate(keys):
+    ax = sat_axs[i]
+    # satellite
+    ax.imshow(sat_imgs[key], extent=extent, origin='upper')
+    # bahamas
+    ax.plot(bahamas_ds[key].IRS_LON, bahamas_ds[key].IRS_LAT,
+            color='k', transform=data_crs)
+    # dropsondes
+    ds = dropsonde_ds[key]
+    launch_time = pd.to_datetime(ds.launch_time.to_numpy())
+    x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
+    cross = ax.plot(x, y, 'X', color=cbc[2], markersize=7, transform=data_crs,
+                    zorder=450)
+    if key == 'RF17':
+        for ii, lt in enumerate(launch_time):
+            ax.text(x[ii], y[ii], f'{lt:%H:%M}', c='k', transform=data_crs, zorder=500,
+                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground='white')])
+    else:
+        ds = ds.where(ds.launch_time.isin(ds.launch_time[[1, 6]]), drop=True)
+        launch_time = pd.to_datetime(ds.launch_time.to_numpy())
+        x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
+        for ii, lt in enumerate(launch_time):
+            ax.text(x[ii], y[ii], f"{lt:%H:%M}", color="k", transform=data_crs, zorder=500,
+                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
+
+    ax.coastlines(color='k', linewidth=1)
+    gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False,
+                      linestyle=':')
+    gl.top_labels = False
+    gl.right_labels = False
+
+    ax.set(
+        xlim=(left, right),
+        ylim=(bottom, top),
+    )
+    ax.text(0, 1.03, label[i], transform=ax.transAxes)
 
 # make legend for flight track and dropsondes
 labels = ["HALO flight track", "Case study section",
@@ -842,17 +886,17 @@ labels = ["HALO flight track", "Case study section",
           "Mean sea level pressure (hPa)", "High cloud cover at 12:00 UTC"]
 handles = [plt.plot([], ls="-", color="k")[0],  # flight track
            plt.plot([], ls="-", color=cbc[1])[0],  # case study section
-           cross,  # dropsondes
+           plt.plot([],  ls='', marker='X', color=cbc[2], markersize=7)[0],  # dropsondes
            plt.plot([], ls="--", color="#332288")[0],  # sea ice edge
            plt.plot([], ls="solid", lw=0.7, color="k")[0],  # isobars
            Patch(facecolor="royalblue", alpha=0.5)]  # cloud cover
 fig.legend(handles=handles, labels=labels, framealpha=1, ncols=3,
            loc="outside lower center")
 
-cbar = fig.colorbar(line, pad=0.01, ax=ax,
-                    shrink=plt_sett["shrink"],
-                    ticks=plt_sett["cmap_ticks"])
-cbar.set_label(label=plt_sett['label'])
+# cbar = fig.colorbar(line, pad=0.1, ax=axs["B"],
+#                     shrink=plt_sett["shrink"],
+#                     ticks=plt_sett["cmap_ticks"])
+# cbar.set_label(label=plt_sett['label'])
 
 figname = f"{plot_path}/HALO-AC3_RF17_RF18_fligh_track_trajectories_plot_overview.png"
 plt.savefig(figname, dpi=600)
@@ -1037,7 +1081,7 @@ ds_ds = ds_ds.where(ds_ds.launch_time > pd.Timestamp('2022-04-12 10:30'), drop=T
 x, y = ds_ds.lon.isel(alt=-1), ds_ds.lat.isel(alt=-1)
 launch_times = pd.to_datetime(ds_ds.launch_time.to_numpy())
 for i, lt in enumerate(launch_times):
-    cross = ax.scatter(x[i], y[i], marker="x", c="orangered", s=8,
+    cross = ax.scatter(x[i], y[i], marker="x", c=cbc[2], s=8,
                        label="Dropsonde",
                        transform=data_crs,
                        zorder=450)
@@ -1046,7 +1090,7 @@ for i, lt in enumerate(launch_times):
             path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
 
 figname = f"{plot_path}/HALO-AC3_RF18_fligh_track_trajectories_plot_overview_zoom.png"
-plt.savefig(figname, dpi=600, bbox_inches='tight')
+plt.savefig(figname, dpi=600)
 plt.show()
 plt.close()
 
@@ -2029,61 +2073,6 @@ ax.grid()
 ax.legend()
 plt.show()
 plt.close()
-# %% plot satellite image together with flight track
-labels = ['(a)', '(b)']
-date_title = ['11 April 2022', '12 April 2022']
-data_crs = ccrs.PlateCarree()
-plot_crs = ccrs.NorthPolarStereo(central_longitude=-45)
-extent = sat_img_extent
-plt.rc('font', size=10)
-_, axs = plt.subplots(1, 2, figsize=(18 * h.cm, 9 * h.cm),
-                      subplot_kw={'projection': plot_crs},
-                      layout='constrained')
-for i, key in enumerate(keys):
-    ax = axs[i]
-    # satellite
-    ax.imshow(sat_imgs[key], extent=extent, origin='upper')
-    # bahamas
-    ax.plot(bahamas_ds[key].IRS_LON, bahamas_ds[key].IRS_LAT,
-            color='k', transform=data_crs, label='HALO flight track')
-    # dropsondes
-    ds = dropsonde_ds[key]
-    launch_time = pd.to_datetime(ds.launch_time.to_numpy())
-    x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
-    cross = ax.plot(x, y, 'X', color=cbc[0], markersize=7, transform=data_crs,
-                    zorder=450)
-    if key == 'RF17':
-        for ii, lt in enumerate(launch_time):
-            ax.text(x[ii], y[ii], f'{lt:%H:%M}', c='k', transform=data_crs, zorder=500,
-                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground='white')])
-    else:
-        ds = ds.where(ds.launch_time.isin(ds.launch_time[[1, 6]]), drop=True)
-        launch_time = pd.to_datetime(ds.launch_time.to_numpy())
-        x, y = ds.lon.mean(dim='alt').to_numpy(), ds.lat.mean(dim='alt').to_numpy()
-        for ii, lt in enumerate(launch_time):
-            ax.text(x[ii], y[ii], f"{lt:%H:%M}", color="k", transform=data_crs, zorder=500,
-                    path_effects=[patheffects.withStroke(linewidth=0.5, foreground="white")])
-    # add legend artist
-    ax.plot([], label='Dropsonde', ls='', marker='X', color=cbc[0], markersize=7)
-
-    ax.coastlines(color='k', linewidth=1)
-    gl = ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
-    gl.top_labels = False
-    gl.right_labels = False
-
-    ax.set(
-        xlim=(left, right),
-        ylim=(bottom, top),
-    )
-    ax.set_title(f'{labels[i]} {key.replace("1", " 1")} - {date_title[i]}', fontsize=10)
-
-
-axs[1].legend()
-figname = f'{plot_path}/HALO-AC3_RF17_RF18_MODIS_Bands367_flight_track.pdf'
-plt.savefig(figname, dpi=300)
-plt.show()
-plt.close()
-
 # %% plot reice with and without cosine dependence and using VarCloud IWC as input for case study clouds
 plt.rc("font", size=10)
 legend_labels = ["Off (IWC IFS)", "On (IWC IFS)", "Off (IWC VarCloud)", "On (IWC VarCloud)"]
