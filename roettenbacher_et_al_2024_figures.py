@@ -52,7 +52,7 @@ cbc = h.get_cb_friendly_colors("petroff_6")
 
 # %% set paths
 campaign = "halo-ac3"
-plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figures_review"
+plot_path = "C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/figures_upload"
 save_path = 'C:/Users/Johannes/Documents/Doktor/manuscripts/_arctic_cirrus/data'
 h.make_dir(plot_path)
 trajectory_path = f"{h.get_path('trajectories', campaign=campaign)}/selection_CC_and_altitude"
@@ -423,7 +423,7 @@ print(f"Range of circle area covered by the 9 gridpoints surrounding the closest
       f"Time HALO needs to cover these circles: "
       f"{min_dist * 2 * 1000 / halo_speed / 60:.2f} - {max_dist * 2 * 1000 / halo_speed / 60:.2f} minutes")
 
-# %% plot BACARDI six panel plot with above and below cloud measurements and transmissivity - solar
+# %% 02 - plot BACARDI six panel plot with above and below cloud measurements and transmissivity - solar
 plt.rc("font", size=9)
 xlims = [(0, 240), (0, 320)]
 ylim_transmissivity = (0.45, 1)
@@ -534,12 +534,12 @@ for ax, label in zip(axs.flatten(), ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)"]):
     ax.text(label_xy[0], label_xy[1], label, transform=ax.transAxes)
 
 plt.tight_layout()
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_BACARDI_case_studies_6panel.pdf"
+figname = f"{plot_path}/02_HALO-AC3_HALO_RF17_RF18_BACARDI_case_studies_6panel.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot IFS cloud fraction lidar/mask comparison
+# %% 04 - plot IFS cloud fraction lidar/mask comparison
 var = 'cloud_fraction'
 plt.rc("font", size=10)
 fig, axs = plt.subplots(2, 1, figsize=(18 * h.cm, 11 * h.cm), layout="constrained")
@@ -593,12 +593,12 @@ axs[0].set_xlabel("")
 axs[0].text(0.01, 0.85, "(a) RF 17", transform=axs[0].transAxes, bbox=dict(boxstyle="Round", fc="white"))
 axs[1].text(0.01, 0.85, "(b) RF 18", transform=axs[1].transAxes, bbox=dict(boxstyle="Round", fc="white"))
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_{var}_radar_lidar_mask.pdf"
+figname = f"{plot_path}/04_HALO-AC3_HALO_RF17_RF18_IFS_{var}_radar_lidar_mask.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot flight track together with trajectories and high cloud cover
+# %% 01 - plot flight track together with trajectories and high cloud cover
 cmap = mpl.colormaps["tab20b_r"]([20, 20, 0, 3, 4, 7, 8, 11, 12, 15, 16, 19])
 cmap[:2] = mpl.colormaps["tab20c"]([7, 4])
 cmap = mpl.colors.ListedColormap(cmap)
@@ -898,7 +898,7 @@ fig.legend(handles=handles, labels=labels, framealpha=1, ncols=3,
 #                     ticks=plt_sett["cmap_ticks"])
 # cbar.set_label(label=plt_sett['label'])
 
-figname = f"{plot_path}/HALO-AC3_RF17_RF18_fligh_track_trajectories_plot_overview.png"
+figname = f"{plot_path}/01_HALO-AC3_RF17_RF18_fligh_track_trajectories_plot_overview.png"
 plt.savefig(figname, dpi=600)
 plt.show()
 plt.close()
@@ -1141,7 +1141,7 @@ for i, key in enumerate(keys):
           f" {np.abs(ds1_diff.rh_ice).max().to_numpy():.2f} %\n"
           )
 
-# %% plot temperature and humidity profiles from IFS and from dropsonde
+# %% 03 - plot temperature and humidity profiles from IFS and from dropsonde
 below_cloud_altitude = dict()
 date_title = ['11 April 2022', '12 April 2022']
 h.set_cb_friendly_colors("petroff_8")
@@ -1208,13 +1208,13 @@ axs[1].text(0.02, 0.95, "(b)", transform=axs[1].transAxes)
 axs[2].text(0.02, 0.95, "(c)", transform=axs[2].transAxes)
 axs[3].text(0.02, 0.95, "(d)", transform=axs[3].transAxes)
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_ifs_dropsonde_t_rh.pdf"
+figname = f"{plot_path}/03_HALO-AC3_HALO_RF17_RF18_ifs_dropsonde_t_rh.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 h.set_cb_friendly_colors("petroff_6")
 
-# %% plot scatter plot of above cloud measurements and simulations
+# %% 06 - plot scatter plot of above cloud measurements and simulations
 plt.rc("font", size=10)
 label = ["(a)", "(b)"]
 date_title = ['11 April 2022', '12 April 2022']
@@ -1257,12 +1257,12 @@ for v in ["v15.1"]:
         )
         ax.set_title(f'{key.replace("1", " 1")} - {date_title[i]}', fontsize=10)
 
-    figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_f_down_solar_above_cloud_all_{v}.pdf"
+    figname = f"{plot_path}/06_HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_f_down_solar_above_cloud_all_{v}.pdf"
     plt.savefig(figname, dpi=300)
     plt.show()
     plt.close()
 
-# %% plot PDF of IWC, IWP and re_ice
+# %% 09 - plot PDF of IWC, IWP and re_ice
 plt.rc("font", size=9)
 legend_labels = ["VarCloud", "IFS"]
 binsizes = dict(iwc=1, tiwp=10, reice=4)
@@ -1455,7 +1455,7 @@ ax.set(ylabel="",
        xlabel=f"Ice effective radius ({h.plot_units['re_ice']})",
        ylim=ylims["reice"])
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_iwp_re_ice_pdf_case_studies.pdf"
+figname = f"{plot_path}/09_HALO-AC3_HALO_RF17_RF18_IFS_iwc_iwp_re_ice_pdf_case_studies.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
@@ -1597,7 +1597,7 @@ plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot PDF of transmissivity (above cloud simulation) below cloud all columns - all ice optics
+# %% 07 - plot PDF of transmissivity (above cloud simulation) below cloud all columns - all ice optics
 transmissivity_stats = list()
 plt.rc("font", size=7.5)
 label = [["(a)", "(b)", "(c)"], ["(d)", "(e)", "(f)"]]
@@ -1664,14 +1664,14 @@ for i, key in enumerate(keys):
     if key == "RF18":
         ax[1].set(xlabel=xlabel)
 
-figname = (f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
+figname = (f"{plot_path}/07_HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
            f"_below_cloud_ice_optics"
            f"_all_columns.pdf")
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot PDF of transmissivity (above cloud simulation) below cloud  - varcloud all ice optics
+# %% 10 - plot PDF of transmissivity (above cloud simulation) below cloud  - varcloud all ice optics
 plt.rc("font", size=7.5)
 label = [["(a)", "(b)", "(c)"], ["(d)", "(e)", "(f)"]]
 ylims = [(0, 36), (0, 36)]
@@ -1683,7 +1683,7 @@ for i, key in enumerate(keys):
     ax = axs[i]
     l = label[i]
     bacardi_sel = bacardi_ds[key].sel(time=slices[key]["below"])
-    bacardi_plot = bacardi_sel[f"transmissivity_above_cloud"].resample(time="1Min").mean()
+    bacardi_plot = bacardi_sel[f"transmissivity_above_cloud"].resample(time="1s").mean()
     bins = np.arange(0.5, 1.0, binsize)
     # BACARDI histogram
     bacardi_hist = np.histogram(bacardi_plot, density=True, bins=bins)
@@ -1735,7 +1735,7 @@ for i, key in enumerate(keys):
     if key == "RF18":
         ax[1].set(xlabel=xlabel)
 
-figname = (f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
+figname = (f"{plot_path}/10_HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
            f"_below_cloud_ice_optics_all_columns_varcloud.pdf")
 plt.savefig(figname, dpi=300)
 plt.show()
@@ -1841,7 +1841,7 @@ plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot PDF of IWC from IFS above cloud for 11 and 12 UTC
+# %% 05 - plot PDF of IWC from IFS above cloud for 11 and 12 UTC
 plt.rc("font", size=10)
 legend_labels = ["11 UTC", "12 UTC"]
 binsizes = dict(iwc=1, reice=4)
@@ -1914,7 +1914,7 @@ ax.text(0.05, 0.93,
         )
 ax.set_title("RF 18 - 12 April 2022", fontsize=10)
 
-figname = f"{plot_path}/HALO-AC3_HALO_RF17_RF18_IFS_iwc_11_vs_12_pdf_case_studies.pdf"
+figname = f"{plot_path}/05_HALO-AC3_HALO_RF17_RF18_IFS_iwc_11_vs_12_pdf_case_studies.pdf"
 plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
@@ -2148,7 +2148,7 @@ plt.savefig(figname, dpi=300)
 plt.show()
 plt.close()
 
-# %% plot PDF of transmissivity (above cloud simulation) below cloud all columns - cosine dependence
+# %% 08 - plot PDF of transmissivity (above cloud simulation) below cloud all columns - cosine dependence
 transmissivity_stats = list()
 plt.rc("font", size=10)
 label = ["(a)", "(b)"]
@@ -2219,7 +2219,7 @@ for i, key in enumerate(keys):
     ax.set(title=f"{key.replace('1', ' 1')} (n = {len(ecrad_plot.to_numpy().flatten()):.0f})")
 
 axs[0].set(ylabel="Probability density function")
-figname = (f"{plot_path}/HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
+figname = (f"{plot_path}/08_HALO-AC3_HALO_RF17_RF18_bacardi_ecrad_transmissivity_above_cloud_PDF"
            f"_below_cloud_cosine_dependence"
            f"_all_columns_fu.pdf")
 plt.savefig(figname, dpi=300)
