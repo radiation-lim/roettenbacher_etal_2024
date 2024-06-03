@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/734339400.svg)](https://zenodo.org/doi/10.5281/zenodo.11444539)
+
 # Repository for publication Röttenbacher et al. 2024
 
 Corresponding repository to the paper handed in to ACP.
